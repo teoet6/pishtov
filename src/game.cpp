@@ -1,4 +1,18 @@
 #include "pishtov.h"
+using pshtv::fill_rect;
+using pshtv::fill_style;
+
+float my_x, my_y;
+
+void update() {
+    my_x += (mouse_x - my_x) / 10;
+    my_y += (mouse_y - my_y) / 10;
+}
+
+void draw() {
+    fill_style(0, 0, 255);
+    fill_rect(my_x, my_y, 30, 30);
+}
 
 void keydown(int key) { 
     std::cout << "Keydown " << key << std::endl;
@@ -12,12 +26,3 @@ void mouseup(int button) {
     std::cout << "Mouse clicked at " << mouse_x << " " << mouse_y << " from " << window_w << " " << window_h << std::endl;
 }
 
-int main() {
-    open_window("Igra", 800, 600);
-    std::cout << "opened?" << std::endl;
-    while (true) {
-        handle_events();
-        fill_rect(30, 30, 30, 30);
-        redraw();
-    }
-}

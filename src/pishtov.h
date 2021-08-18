@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cstdlib>
+#include <thread>
+#include <chrono>
 
 #define ALIAS_FUNCTIONS
 
@@ -7,28 +9,28 @@ void keydown(int key);
 void keyup(int key);
 void mousedown(int button);
 void mouseup(int button);
-int mouse_x, mouse_y;
-int window_w, window_h;
+void update();
+void draw();
+float mouse_x, mouse_y;
+float window_w, window_h;
 
 namespace pshtv {
 
+    // This part of Pishtov deals with os-specific stuff. This includes opening
+    // a window, making an OpenGL context for said window, processing keyboard
+    // and mouse input, swapping the buffers, providing functions that arent in
+    // the C++ standard library and more. You need to have the following
+    // functions defined for each OS:
     void open_window(char *name, int w, int h); // Opens a window.
-    void handle_events(); // Asks the os for new events and react accordingly.
-    void redraw(); // Usually swaps buffers. Might be a noop.
-    void fill_rect();
+    void handle_events(); // Asks the os for new events and reacts accordingly.
+    void swap_buffers(); // Swaps the OpenGL buffers. Can be a noop.
 
 #if defined(_WIN32)
-
 #error Windows not supported
-
 #elif defined(__APPLE__)
-
 #error Apple not supported
-
 #elif defined(__ANDROID__)
-
 #error Andoird not supported
-
 #else // Assume X11
     // https://github.com/gamedevtech/X11OpenGLWindow
 
@@ -89,11 +91,6 @@ namespace pshtv {
 
         context = glXCreateContext(display, visual_info, NULL, GL_TRUE);
         glXMakeCurrent(display, window, context);
-
-        std::cerr << "GL Vendor: " << glGetString(GL_VENDOR) << "\n";
-        std::cerr << "GL Renderer: " << glGetString(GL_RENDERER) << "\n";
-        std::cerr << "GL Version: " << glGetString(GL_VERSION) << "\n";
-        std::cerr << "GL Shading Language: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << "\n";
 
         XClearWindow(display, window);
 
@@ -378,37 +375,59 @@ namespace pshtv {
             case ConfigureNotify:
                 window_w = ev.xconfigure.width;
                 window_h = ev.xconfigure.height;
+                glViewport(0, 0, window_w, window_h);
+                break;
             }
         }
     }
 
-    void redraw() {
+    void swap_buffers() {
         glXSwapBuffers(display, window);
     }
 
-    void fill_rect(int x, int y, int w, int h) {
-        glClear(GL_COLOR_BUFFER_BIT);
+#endif
 
-        glColor3f(1.0f,  0.0f, 0.0f);
+    // This part of Pishtov deals with OpenGL stuff. It deals with different
+    // drawing functions that the end user might use. It currently provides the
+    // following functions:
+    void fill_rect(float x, float y, float w, float h); // Draws a rectangle at x, y with dimensions w, h
+    void fill_style(float r, float g, float b); // Changes the color. Values for each channel are in the range [0; 255].
+
+    void fill_rect(float x, float y, float w, float h) {
+        const float ww = window_w;
+        const float wh = window_h;
+
         glBegin(GL_QUADS);
-        //glVertex2i(x + 0, y + 0);
-        //glVertex2i(x + w, y + 0);
-        //glVertex2i(x + w, y + h);
-        //glVertex2i(x + 0, y + h);
-        
-        glVertex2f(0.0, 0.0);
-        glVertex2f(1.0, 0.0);
-        glVertex2f(1.0, 1.0);
-        glVertex2f(0.0, 1.0);
+        glVertex2f(2 * (x + 0) / ww - 1, -(2 * (y + 0) / wh - 1));
+        glVertex2f(2 * (x + w) / ww - 1, -(2 * (y + 0) / wh - 1));
+        glVertex2f(2 * (x + w) / ww - 1, -(2 * (y + h) / wh - 1));
+        glVertex2f(2 * (x + 0) / ww - 1, -(2 * (y + h) / wh - 1));
         glEnd();
     }
 
-#endif
+    void fill_style(float r, float g, float b) {
+        glColor3f(r / 255,  g / 255, b / 255);
+    }
+
+    void redraw() {
+        swap_buffers();
+        glClear(GL_COLOR_BUFFER_BIT);
+        fill_style(255, 255, 255);
+        fill_rect(0, 0, window_w, window_h);
+    }
 }
 
-#ifdef ALIAS_FUNCTIONS
-#define open_window pshtv::open_window
-#define handle_events pshtv::handle_events
-#define redraw pshtv::redraw
-#define fill_rect pshtv::fill_rect
-#endif
+// This part of Pishtov defines the main game loop. It might be better to rename
+// it to something like pishtov_loop() and then have the end user call it from
+// main().
+
+int main() {
+    pshtv::open_window("Igra", 800, 600);
+    while (true) {
+        pshtv::handle_events();
+        update();
+        draw();
+        pshtv::redraw();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
