@@ -9,7 +9,7 @@ void keyup(int key) { }
 void mousedown(int button) { }
 
 void mouseup(int button) { 
-    std::cout << "Mouse clicked at " << mouse_x << " " << mouse_y << std::endl;
+    std::cout << "Mouse clicked at " << mouse_x << " " << mouse_y << " from " << window_w << " " << window_h << std::endl;
 }
 
 int main() {
@@ -17,5 +17,7 @@ int main() {
     std::cout << "opened?" << std::endl;
     while (true) {
         handle_events();
+        fill_rect(30, 30, 30, 30);
+        redraw();
     }
 }

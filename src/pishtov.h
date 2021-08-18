@@ -8,11 +8,14 @@ void keyup(int key);
 void mousedown(int button);
 void mouseup(int button);
 int mouse_x, mouse_y;
+int window_w, window_h;
 
 namespace pshtv {
 
     void open_window(char *name, int w, int h); // Opens a window.
     void handle_events(); // Asks the os for new events and react accordingly.
+    void redraw(); // Usually swaps buffers. Might be a noop.
+    void fill_rect();
 
 #if defined(_WIN32)
 
@@ -32,21 +35,65 @@ namespace pshtv {
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysymdef.h>
+#include <GL/gl.h>
+#include <GL/glx.h>
 
     Display *display;
     Window window;
     int screen_id;
+    GLXContext context;
 
     void open_window(char *name, int w, int h) {
         display = XOpenDisplay(NULL);
         if (display == NULL) {
             std::cerr << "Error opening X11 display" << std::endl;
-            exit(0);
+            exit(-1);
         }
 
         screen_id = DefaultScreen(display);
 
-        window = XCreateSimpleWindow(display, RootWindow(display, screen_id), 0, 0, w, h, 0, 0, BlackPixel(display, screen_id));
+        GLint majorGLX = 0, minorGLX = 0;
+        glXQueryVersion(display, &majorGLX, &minorGLX);
+        if (majorGLX < 1 && minorGLX < 2) {
+            std::cerr << "glx version is " << majorGLX << "." << minorGLX << std::endl;
+            std::cerr << "Minimum supported glx version is 1.2" << std::endl;
+            exit(-1);
+        }
+
+        GLint glx_attribs[] = {
+            GLX_RGBA,
+            GLX_DOUBLEBUFFER,
+            GLX_DEPTH_SIZE, 24,
+            GLX_STENCIL_SIZE, 8,
+            GLX_RED_SIZE, 8,
+            GLX_GREEN_SIZE, 8,
+            GLX_BLUE_SIZE, 8,
+            // GLX_SAMPLE_BUFFERS, 0,
+            // GLX_SAMPLES, 0,
+            None,
+        };
+        XVisualInfo* visual_info = glXChooseVisual(display, screen_id, glx_attribs);
+        if (visual_info == NULL) {
+            std::cerr << "Could not create correct visual window\n" << std::endl;
+            exit(-1);
+        }
+
+        XSetWindowAttributes attributes;
+        attributes.border_pixel = BlackPixel(display, screen_id);
+        attributes.background_pixel = WhitePixel(display, screen_id);
+        attributes.override_redirect = True;
+        attributes.colormap = XCreateColormap(display, RootWindow(display, screen_id), visual_info->visual, AllocNone);
+        attributes.event_mask = ExposureMask;
+
+        window = XCreateWindow(display, RootWindow(display, screen_id), 0, 0, w, h, 0, visual_info->depth, InputOutput, visual_info->visual, CWBackPixel | CWColormap | CWBorderPixel | CWEventMask, &attributes);
+
+        context = glXCreateContext(display, visual_info, NULL, GL_TRUE);
+        glXMakeCurrent(display, window, context);
+
+        std::cerr << "GL Vendor: " << glGetString(GL_VENDOR) << "\n";
+        std::cerr << "GL Renderer: " << glGetString(GL_RENDERER) << "\n";
+        std::cerr << "GL Version: " << glGetString(GL_VERSION) << "\n";
+        std::cerr << "GL Shading Language: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << "\n";
 
         XClearWindow(display, window);
 
@@ -56,7 +103,10 @@ namespace pshtv {
                      ButtonReleaseMask |
                      KeyPressMask |
                      KeyReleaseMask |
-                     KeymapStateMask);
+                     KeymapStateMask |
+                     StructureNotifyMask);
+
+        XStoreName(display, window, name);
 
         XMapWindow(display, window);
     }
@@ -325,14 +375,40 @@ namespace pshtv {
             case KeymapNotify:
                 XRefreshKeyboardMapping(&ev.xmapping);
                 break;
+            case ConfigureNotify:
+                window_w = ev.xconfigure.width;
+                window_h = ev.xconfigure.height;
             }
         }
+    }
+
+    void redraw() {
+        glXSwapBuffers(display, window);
+    }
+
+    void fill_rect(int x, int y, int w, int h) {
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glColor3f(1.0f,  0.0f, 0.0f);
+        glBegin(GL_QUADS);
+        //glVertex2i(x + 0, y + 0);
+        //glVertex2i(x + w, y + 0);
+        //glVertex2i(x + w, y + h);
+        //glVertex2i(x + 0, y + h);
+        
+        glVertex2f(0.0, 0.0);
+        glVertex2f(1.0, 0.0);
+        glVertex2f(1.0, 1.0);
+        glVertex2f(0.0, 1.0);
+        glEnd();
     }
 
 #endif
 }
 
 #ifdef ALIAS_FUNCTIONS
-constexpr auto open_window = pshtv::open_window;
-constexpr auto handle_events = pshtv::handle_events;
+#define open_window pshtv::open_window
+#define handle_events pshtv::handle_events
+#define redraw pshtv::redraw
+#define fill_rect pshtv::fill_rect
 #endif

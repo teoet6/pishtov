@@ -1,3 +1,3 @@
 #!/bin/sh
 
-g++ -lX11 -O2 -o dist/game src/game.cpp
+g++ -lX11 -lGL -O2 -o dist/game src/game.cpp
