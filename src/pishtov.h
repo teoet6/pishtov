@@ -1,9 +1,54 @@
+// Copyright (c) 2021 Theodor Totev - teoet6
+/*
+Pishtov is a C++ header that mimics Yashu's JS Pishtov. It tries not only
+to be faster by being written in C++ but to also be more powerful.
+
+The point of the JS Pishtov is to remove the boilerplate from game programming
+and thus make it easy to teach children programming. The JS Pishtov is very
+successful in this domain. Many young programmers were and are taught
+programming using it. Despite this the JS Pishtov has flaws - it is near
+impossible to make a performance-intensive game in it, it fails at teaching
+important material like types, files, threads, and sometimes even the idea that
+code is executed top to bottom. The JS Pishtov frequently conflicts with the
+other most prevalent programming material in Bulgaria - competitive
+programming - it's hard to teach games to competitive programmers and even
+harder to teach cp to game programmers.
+
+This Pishtov tries to retain the ease-of-use for new programmers, but also to
+allow skilled programmers to create faster and bigger games and simulations.
+Another goal of this Pishtov is to expand the material learned from the
+original JS Pishtov with materials like files, threading, network programming,
+and more.
+
+An extra goal is being able to be compiled in a default Code::Block Windows
+install i.e. without changing any linker or compiler settings. This is
+important in order to retain the no-boilerplate policy of the JS Pishtov.
+Originally all you had to do is edit game.js and open start.html in a browser.
+Similarly all you should do with the C++ Pishtov is edit game.cpp, compile and
+run. Making the end-user (who is possibly a child) edit linker settings before
+compiling his game breaks this workflow.
+
+An extra extra goal is compiling to WASM and Android.
+
+TODO
+    [X] Rectangles
+    [ ] Circles and Arcs
+    [ ] Lines
+    [ ] Images
+    [ ] Translation and rotation of the canvas
+    [ ] OS-independent network-programming
+    [ ] 3D graphics
+    [ ] Shaders
+    [ ] An optional define stating whether or not you want a main game loop or just the library functions
+    [ ] Default Code::Blocks Windows compile
+    [ ] WASM compile
+    [ ] Android compile
+*/
+
 #include <iostream>
 #include <cstdlib>
 #include <thread>
 #include <chrono>
-
-#define ALIAS_FUNCTIONS
 
 void keydown(int key);
 void keyup(int key);
@@ -16,13 +61,13 @@ float window_w, window_h;
 
 namespace pshtv {
 
-    // This part of Pishtov deals with os-specific stuff. This includes opening
+    // This part of Pishtov deals with OS-specific stuff. This includes opening
     // a window, making an OpenGL context for said window, processing keyboard
-    // and mouse input, swapping the buffers, providing functions that arent in
-    // the C++ standard library and more. You need to have the following
+    // and mouse input, swapping the buffers, providing functions that aren't
+    // in the C++ standard library and more. You need to have the following
     // functions defined for each OS:
     void open_window(char *name, int w, int h); // Opens a window.
-    void handle_events(); // Asks the os for new events and reacts accordingly.
+    void handle_events(); // Asks the OS for new events and reacts accordingly.
     void swap_buffers(); // Swaps the OpenGL buffers. Can be a noop.
 
 #if defined(_WIN32)
@@ -131,7 +176,7 @@ namespace pshtv {
         case XK_Alt_R:          return 0x12; // VK_MENU 0x12 ALT key
         case XK_Pause:          return 0x13; // VK_PAUSE 0x13 PAUSE key
         case XK_Caps_Lock:      return 0x14; // VK_CAPITAL 0x14 CAPS LOCK key
-                                             // TODO I dont even know what these buttons are supposed to do
+                                             // TODO I don't even know what these buttons are supposed to do
                                              // VK_KANA 0x15 IME Kana mode
                                              // VK_HANGUEL 0x15 IME Hanguel mode (maintained for compatibility; use VK_HANGUL)
                                              // VK_HANGUL 0x15 IME Hangul mode
@@ -417,9 +462,7 @@ namespace pshtv {
     }
 }
 
-// This part of Pishtov defines the main game loop. It might be better to rename
-// it to something like pishtov_loop() and then have the end user call it from
-// main().
+// This part of Pishtov defines the main game loop.
 
 int main() {
     pshtv::open_window("Igra", 800, 600);
