@@ -89,6 +89,7 @@ namespace pshtv {
     Window window;
     int screen_id;
     GLXContext context;
+    Atom atom_wm_delete_window;
 
     void open_window(char *name, int w, int h) {
         display = XOpenDisplay(NULL);
@@ -134,10 +135,14 @@ namespace pshtv {
 
         window = XCreateWindow(display, RootWindow(display, screen_id), 0, 0, w, h, 0, visual_info->depth, InputOutput, visual_info->visual, CWBackPixel | CWColormap | CWBorderPixel | CWEventMask, &attributes);
 
+        atom_wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
+        XSetWMProtocols(display, window, &atom_wm_delete_window, 1);
+
         context = glXCreateContext(display, visual_info, NULL, GL_TRUE);
         glXMakeCurrent(display, window, context);
 
         XClearWindow(display, window);
+
 
         XSelectInput(display, window,
                      PointerMotionMask |
@@ -421,6 +426,13 @@ namespace pshtv {
                 window_w = ev.xconfigure.width;
                 window_h = ev.xconfigure.height;
                 glViewport(0, 0, window_w, window_h);
+                break;
+            case ClientMessage:
+                if (ev.xclient.data.l[0] == atom_wm_delete_window)
+                    exit(0);
+                break;
+            case DestroyNotify:
+                exit(0);
                 break;
             }
         }
