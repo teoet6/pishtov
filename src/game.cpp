@@ -1,5 +1,6 @@
 #include "pishtov.h"
 using pshtv::fill_rect;
+using pshtv::fill_circle;
 using pshtv::fill_style;
 
 float my_x, my_y;
@@ -10,8 +11,8 @@ void update() {
 }
 
 void draw() {
-    fill_style(0, 0, 255);
-    fill_rect(my_x, my_y, 30, 30);
+    fill_style(0, 0, 1);
+    fill_circle(my_x, my_y, 20);
 }
 
 void keydown(int key) { 

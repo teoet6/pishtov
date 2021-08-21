@@ -30,11 +30,13 @@ compiling his game breaks this workflow.
 
 An extra extra goal is compiling to WASM and Android.
 
-TODO
+TODO In no particular order
     [X] Rectangles
-    [ ] Circles and Arcs
+    [X] Circles
+    [ ] Arcs
     [ ] Lines
     [ ] Images
+    [ ] Text
     [ ] Translation and rotation of the canvas
     [ ] OS-independent network-programming
     [ ] 3D graphics
@@ -66,7 +68,7 @@ namespace pshtv {
     // and mouse input, swapping the buffers, providing functions that aren't
     // in the C++ standard library and more. You need to have the following
     // functions defined for each OS:
-    void open_window(char *name, int w, int h); // Opens a window.
+    void open_window(const char *name, int w, int h); // Opens a window.
     void handle_events(); // Asks the OS for new events and reacts accordingly.
     void swap_buffers(); // Swaps the OpenGL buffers. Can be a noop.
 
@@ -84,6 +86,7 @@ namespace pshtv {
 #include <X11/keysymdef.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
+#include <dlfcn.h>
 
     Display *display;
     Window window;
@@ -91,7 +94,8 @@ namespace pshtv {
     GLXContext context;
     Atom atom_wm_delete_window;
 
-    void open_window(char *name, int w, int h) {
+    void open_window(const char *name, int w, int h) {
+
         display = XOpenDisplay(NULL);
         if (display == NULL) {
             std::cerr << "Error opening X11 display" << std::endl;
@@ -142,7 +146,6 @@ namespace pshtv {
         glXMakeCurrent(display, window, context);
 
         XClearWindow(display, window);
-
 
         XSelectInput(display, window,
                      PointerMotionMask |
@@ -442,35 +445,185 @@ namespace pshtv {
         glXSwapBuffers(display, window);
     }
 
+    void *load_gl_ext(const char *name) {
+        static void *gl_handle;
+        if (!gl_handle)
+            gl_handle = dlopen("libGL.so", RTLD_LAZY);
+        return dlsym(gl_handle, name);
+    }
+
 #endif
+
+#include <GL/gl.h>
+#include <GL/glext.h>
+
+    PFNGLCREATESHADERPROC      glCreateShader;
+    PFNGLSHADERSOURCEPROC      glShaderSource;
+    PFNGLCOMPILESHADERPROC     glCompileShader;
+    PFNGLGETSHADERIVPROC       glGetShaderiv;
+    PFNGLGETSHADERINFOLOGPROC  glGetShaderInfoLog;
+    PFNGLCREATEPROGRAMPROC     glCreateProgram;
+    PFNGLATTACHSHADERPROC      glAttachShader;
+    PFNGLLINKPROGRAMPROC       glLinkProgram;
+    PFNGLGETPROGRAMIVPROC      glGetProgramiv;
+    PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog;
+    PFNGLDELETESHADERPROC      glDeleteShader;
+    PFNGLUSEPROGRAMPROC        glUseProgram;
+
+#define LOAD_GL_EXT(T, X) X = (T)load_gl_ext(#X)
+    void load_gl_exts() {
+        LOAD_GL_EXT(PFNGLCREATESHADERPROC,      glCreateShader);
+        LOAD_GL_EXT(PFNGLSHADERSOURCEPROC,      glShaderSource);
+        LOAD_GL_EXT(PFNGLCOMPILESHADERPROC,     glCompileShader);
+        LOAD_GL_EXT(PFNGLGETSHADERIVPROC,       glGetShaderiv);
+        LOAD_GL_EXT(PFNGLGETSHADERINFOLOGPROC,  glGetShaderInfoLog);
+        LOAD_GL_EXT(PFNGLCREATEPROGRAMPROC,     glCreateProgram);
+        LOAD_GL_EXT(PFNGLATTACHSHADERPROC,      glAttachShader);
+        LOAD_GL_EXT(PFNGLLINKPROGRAMPROC,       glLinkProgram);
+        LOAD_GL_EXT(PFNGLGETPROGRAMIVPROC,      glGetProgramiv);
+        LOAD_GL_EXT(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog);
+        LOAD_GL_EXT(PFNGLDELETESHADERPROC,      glDeleteShader);
+        LOAD_GL_EXT(PFNGLUSEPROGRAMPROC,        glUseProgram);
+    }
+#undef LOAD_GL_EXT
 
     // This part of Pishtov deals with OpenGL stuff. It deals with different
     // drawing functions that the end user might use. It currently provides the
     // following functions:
     void fill_rect(float x, float y, float w, float h); // Draws a rectangle at x, y with dimensions w, h
-    void fill_style(float r, float g, float b); // Changes the color. Values for each channel are in the range [0; 255].
+    void fill_style(float r, float g, float b); // Changes the color. Values for each channel are in the range [0; 255]
+    void fill_cricle(float x, float y, float r); // Draws a circle at x, y with radius r
+    void begin_draw();
+    void end_draw();
+
+    unsigned int prog_solid;
+    unsigned int prog_circle;
+
+    unsigned int compile_shader(const char *src, GLenum type) {
+        unsigned int shader = glCreateShader(type);
+
+        glShaderSource(shader, 1, &src, NULL);
+        glCompileShader(shader);
+
+        int success;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            char info[512];
+            glGetShaderInfoLog(shader, 512, NULL, info);
+            std::cerr << info << std::endl;
+        }
+
+        return shader;
+    }
+
+    unsigned int simple_shader_prog(const char *vertex_src, const char *fragment_src) {
+        unsigned int prog = glCreateProgram();
+
+        unsigned int vertex_shader = compile_shader(vertex_src, GL_VERTEX_SHADER);
+        unsigned int fragment_shader = compile_shader(fragment_src, GL_FRAGMENT_SHADER);
+
+        glAttachShader(prog, vertex_shader);
+        glAttachShader(prog, fragment_shader);
+        glLinkProgram(prog);
+
+        int success;
+        glGetProgramiv(prog, GL_LINK_STATUS, &success);
+        if (!success) {
+            char info[512];
+            glGetProgramInfoLog(prog, 512, NULL, info);
+            std::cerr << info << std::endl;
+        }
+
+        glDeleteShader(vertex_shader);
+        glDeleteShader(fragment_shader);
+
+        return prog;
+    }
 
     void fill_rect(float x, float y, float w, float h) {
-        const float ww = window_w;
-        const float wh = window_h;
+        glUseProgram(prog_solid);
 
         glBegin(GL_QUADS);
-        glVertex2f(2 * (x + 0) / ww - 1, -(2 * (y + 0) / wh - 1));
-        glVertex2f(2 * (x + w) / ww - 1, -(2 * (y + 0) / wh - 1));
-        glVertex2f(2 * (x + w) / ww - 1, -(2 * (y + h) / wh - 1));
-        glVertex2f(2 * (x + 0) / ww - 1, -(2 * (y + h) / wh - 1));
+        glVertex2f(x + 0, y + 0);
+        glVertex2f(x + w, y + 0);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x + 0, y + h);
+        glEnd();
+    }
+
+    void fill_circle(float x, float y, float r) {
+        glUseProgram(prog_circle);
+
+        glBegin(GL_QUADS);
+        glTexCoord2f(-1, -1); glVertex2f(x - r, y - r);
+        glTexCoord2f( 1, -1); glVertex2f(x + r, y - r);
+        glTexCoord2f( 1,  1); glVertex2f(x + r, y + r);
+        glTexCoord2f(-1,  1); glVertex2f(x - r, y + r);
         glEnd();
     }
 
     void fill_style(float r, float g, float b) {
-        glColor3f(r / 255,  g / 255, b / 255);
+        glColor3f(r, g, b);
     }
 
-    void redraw() {
-        swap_buffers();
+    void begin_draw() {
+        glClearColor(1.0, 1.0, 1.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT);
-        fill_style(255, 255, 255);
-        fill_rect(0, 0, window_w, window_h);
+
+        float w = 2 / (float)window_w;
+        float h = 2 / (float)window_h;
+        float m[] = { // OpenGL wants the matrix transposed
+             w,  0,  0,  0,
+             0, -h,  0,  0,
+             0,  0,  1,  0,
+            -1,  1,  0,  1,
+        };
+        glMatrixMode(GL_PROJECTION);
+        glLoadMatrixf(&m[0]);
+    }
+
+    void end_draw() {
+        swap_buffers();
+    }
+
+    void init_opengl() {
+        load_gl_exts();
+
+        const char *vertex_src_solid = R"XXX(
+            #version 110
+            void main() {
+                gl_FrontColor = gl_Color;
+                gl_BackColor  = gl_Color;
+                gl_Position   = gl_ProjectionMatrix * gl_Vertex;
+            }
+        )XXX";
+        const char *fragment_src_solid = R"XXX(
+            #version 110
+            void main() {
+                gl_FragColor = gl_Color;
+            }
+        )XXX";
+        prog_solid = simple_shader_prog(vertex_src_solid, fragment_src_solid);
+
+        // TODO anti-aliasing
+        const char *vertex_src_circle = R"XXX(
+            #version 110
+            void main() {
+                gl_FrontColor = gl_Color;
+                gl_BackColor  = gl_Color;
+                gl_TexCoord[0] = gl_MultiTexCoord0;
+                gl_Position   = gl_ProjectionMatrix * gl_Vertex;
+            }
+        )XXX";
+        const char *fragment_src_circle = R"XXX(
+            #version 110
+            void main() {
+                if (length(gl_TexCoord[0].st) > 1.0)
+                    discard;
+                gl_FragColor = gl_Color;
+            }
+        )XXX";
+        prog_circle = simple_shader_prog(vertex_src_circle, fragment_src_circle);
     }
 }
 
@@ -478,11 +631,13 @@ namespace pshtv {
 
 int main() {
     pshtv::open_window("Igra", 800, 600);
+    pshtv::init_opengl();
     while (true) {
         pshtv::handle_events();
         update();
+        pshtv::begin_draw();
         draw();
-        pshtv::redraw();
+        pshtv::end_draw();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
