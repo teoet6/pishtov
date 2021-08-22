@@ -618,7 +618,7 @@ namespace pshtv {
         const char *fragment_src_circle = R"XXX(
             #version 110
             void main() {
-                if (length(gl_TexCoord[0].st) > 1.0)
+                if (dot(gl_TexCoord[0].st, gl_TexCoord[0].st) >= 1.0)
                     discard;
                 gl_FragColor = gl_Color;
             }
