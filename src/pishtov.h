@@ -42,7 +42,7 @@ TODO In no particular order
     [ ] 3D graphics
     [ ] Shaders
     [ ] An optional define stating whether or not you want a main game loop or just the library functions
-    [ ] Default Code::Blocks Windows compile
+    [X] Default Code::Blocks Windows compile
     [ ] WASM compile
     [ ] Android compile
 */
@@ -71,9 +71,160 @@ namespace pshtv {
     void open_window(const char *name, int w, int h); // Opens a window.
     void handle_events(); // Asks the OS for new events and reacts accordingly.
     void swap_buffers(); // Swaps the OpenGL buffers. Can be a noop.
+    void *load_gl(const char *name); // Dynamically loads an OpenGL function
 
-#if defined(_WIN32)
-#error Windows not supported
+    // The other part of the pishtov deals with actually drawing using OpenGL
+    // It defines the following functions:
+    void fill_rect(float x, float y, float w, float h);
+    void fill_circle(float x, float y, float r);
+    void fill_style(float r, float g, float b);
+    void redraw();
+
+#if defined(_WIN32) // Windows 32 or 64 bit
+
+#include <windows.h>
+#include <windowsx.h>
+
+    HWND hwnd;
+    HDC hdc;
+
+    // These are all functions from wingdi so you have to link to them. In
+    // order to retain our goal of compiling with default settings on
+    // Code::Blocks we dynamically load them.
+    typedef int (*PSHTVPROC_CHOOSEPIXELFORMAT) (HDC hdc, const PIXELFORMATDESCRIPTOR *ppfd);
+    typedef BOOL (*PSHTVPROC_SETPIXELFORMAT) (HDC hdc, int format, const PIXELFORMATDESCRIPTOR *ppfd);
+    typedef HGLRC (*PSHTVPROC_WGLCREATECONTEXT) (HDC hdc);
+    typedef BOOL (*PSHTVPROC_WGLMAKECURRENT) (HDC hdc, HGLRC hglrc);
+    typedef BOOL (*PSHTVPROC_SWAPBUFFERS) (HDC hdc);
+    typedef PROC (*PSHTVPROC_WGLGETPROCADDRESS) (LPCSTR unnamedParam1);
+
+    PSHTVPROC_CHOOSEPIXELFORMAT pshtv_ChoosePixelFormat;
+    PSHTVPROC_SETPIXELFORMAT    pshtv_SetPixelFormat;
+    PSHTVPROC_SWAPBUFFERS       pshtv_SwapBuffers;
+    PSHTVPROC_WGLCREATECONTEXT  pshtv_wglCreateContext;
+    PSHTVPROC_WGLMAKECURRENT    pshtv_wglMakeCurrent;
+    PSHTVPROC_WGLGETPROCADDRESS pshtv_wglGetProcAddress;
+
+    void *load_gdi(const char *name) {
+        static HMODULE gdi_handle;
+        if (!gdi_handle)
+            gdi_handle = LoadLibrary("gdi32.dll");
+        return (void*)GetProcAddress(gdi_handle, name);
+    }
+
+    void *load_wgl(const char *name) {
+        static HMODULE gl_handle;
+        if (!gl_handle)
+            gl_handle = LoadLibrary("opengl32.dll");
+        return (void*)GetProcAddress(gl_handle, name);
+    }
+
+    void *load_gl(const char* name) {
+        void *ret = (void*)pshtv_wglGetProcAddress(name);
+        // wglGetProcAddress returs NULL for non-extension functions, so we
+        // need to load the function from opengl32.dll directly.
+        if (!ret)
+            ret = load_wgl(name);
+        return ret;
+    }
+
+    LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+        switch (msg) {
+        case WM_MOUSEMOVE:
+            mouse_x = GET_X_LPARAM(lparam);
+            mouse_y = GET_Y_LPARAM(lparam);
+            return 0;
+        case WM_LBUTTONDOWN: mousedown(1); return 0;
+        case WM_MBUTTONDOWN: mousedown(2); return 0;
+        case WM_RBUTTONDOWN: mousedown(3); return 0;
+        case WM_LBUTTONUP: mouseup(1); return 0;
+        case WM_MBUTTONUP: mouseup(2); return 0;
+        case WM_RBUTTONUP: mouseup(3); return 0;
+        case WM_KEYDOWN:
+            keydown(wparam);
+            return 0;
+        case WM_KEYUP:
+            keyup(wparam);
+            return 0;
+        case WM_SIZE:
+            window_w = LOWORD(lparam);
+            window_h = HIWORD(lparam);
+            return 0;
+        case WM_QUIT:
+            exit(0);
+        }
+        return DefWindowProc(hwnd, msg, wparam, lparam);
+    }
+
+    void open_window(const char *name, int w, int h) {
+        pshtv_ChoosePixelFormat = (PSHTVPROC_CHOOSEPIXELFORMAT) load_gdi("ChoosePixelFormat");
+        pshtv_SetPixelFormat    = (PSHTVPROC_SETPIXELFORMAT)    load_gdi("SetPixelFormat");
+        pshtv_SwapBuffers       = (PSHTVPROC_SWAPBUFFERS)       load_gdi("SwapBuffers");
+        pshtv_wglCreateContext  = (PSHTVPROC_WGLCREATECONTEXT)  load_wgl("wglCreateContext");
+        pshtv_wglMakeCurrent    = (PSHTVPROC_WGLMAKECURRENT)    load_wgl("wglMakeCurrent");
+        pshtv_wglGetProcAddress = (PSHTVPROC_WGLGETPROCADDRESS) load_wgl("wglGetProcAddress");
+
+        HINSTANCE hinstance = GetModuleHandle(NULL);
+
+        WNDCLASS wc = {};
+        wc.lpfnWndProc = window_proc;
+        wc.hInstance   = hinstance;
+        wc.lpszClassName = name;
+        wc.style = CS_OWNDC;
+        wc.hCursor = LoadCursor(hinstance, IDC_ARROW);
+        RegisterClass(&wc);
+
+        hwnd = CreateWindowEx(0, name, name, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, w, h, NULL, NULL, hinstance, NULL);
+        if (hwnd == NULL) {
+            std::cerr << "Could not get window handle" << std::endl;
+            exit(-1);
+        }
+
+        hdc = GetDC(hwnd);
+        if (hdc == NULL) {
+            std::cerr << "Could not get device context" << std::endl;
+            exit(-1);
+        }
+
+        PIXELFORMATDESCRIPTOR pfd = {};
+        pfd.nSize = sizeof(pfd);
+        pfd.nVersion = 1;
+        pfd.dwFlags = PFD_DRAW_TO_WINDOW, PFD_SUPPORT_OPENGL, PFD_DOUBLEBUFFER;
+        pfd.iPixelType = PFD_TYPE_RGBA;
+        pfd.cColorBits = 32;
+        pfd.cDepthBits = 24;
+        pfd.cStencilBits = 8;
+        pfd.iLayerType = PFD_MAIN_PLANE;
+
+        int pixel_format = pshtv_ChoosePixelFormat(hdc, &pfd);
+        if (!pixel_format) {
+            std::cerr << "Could not choose pixel format" << std::endl;
+            exit(-1);
+        }
+
+        pshtv_SetPixelFormat(hdc, pixel_format, &pfd);
+
+        HGLRC context = pshtv_wglCreateContext(hdc);
+        pshtv_wglMakeCurrent(hdc, context);
+
+        ShowWindow(hwnd, SW_NORMAL);
+    }
+
+    void handle_events() {
+        MSG msg = {};
+        while(PeekMessage(&msg, hwnd, 0, 0, PM_NOREMOVE)) {
+            if(GetMessage(&msg, hwnd, 0, 0)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            } else {
+                exit(0);
+            }
+        }
+    }
+
+    void swap_buffers() {
+        pshtv_SwapBuffers(hdc);
+    }
 #elif defined(__APPLE__)
 #error Apple not supported
 #elif defined(__ANDROID__)
@@ -124,7 +275,7 @@ namespace pshtv {
             // GLX_SAMPLES, 0,
             None,
         };
-        XVisualInfo* visual_info = glXChooseVisual(display, screen_id, glx_attribs);
+        XVisualInfo *visual_info = glXChooseVisual(display, screen_id, glx_attribs);
         if (visual_info == NULL) {
             std::cerr << "Could not create correct visual window\n" << std::endl;
             exit(-1);
@@ -307,7 +458,7 @@ namespace pshtv {
         case XK_KP_Add:         return 0x6b; // VK_ADD 0x6B Add key
         case XK_KP_Separator:   return 0x6c;
         case XK_KP_Subtract:    return 0x6d; // VK_SUBTRACT 0x6D Subtract key
-        case XK_KP_Decimal:     
+        case XK_KP_Decimal:
         case XK_KP_Delete:      return 0x6e; // VK_DECIMAL 0x6E Decimal key
         case XK_KP_Divide:      return 0x6f; // VK_DIVIDE 0x6F Divide key
         case XK_F1:             return 0x70; // VK_F1 0x70 F1 key
@@ -419,7 +570,7 @@ namespace pshtv {
             case KeyPress:
                 keydown(translate_key(XLookupKeysym(&ev.xkey, 0)));
                 break;
-            case KeyRelease: 
+            case KeyRelease:
                 keyup(translate_key(XLookupKeysym(&ev.xkey, 0)));
                 break;
             case KeymapNotify:
@@ -428,7 +579,6 @@ namespace pshtv {
             case ConfigureNotify:
                 window_w = ev.xconfigure.width;
                 window_h = ev.xconfigure.height;
-                glViewport(0, 0, window_w, window_h);
                 break;
             case ClientMessage:
                 if (ev.xclient.data.l[0] == atom_wm_delete_window)
@@ -445,7 +595,7 @@ namespace pshtv {
         glXSwapBuffers(display, window);
     }
 
-    void *load_gl_ext(const char *name) {
+    void *load_gl(const char *name) {
         static void *gl_handle;
         if (!gl_handle)
             gl_handle = dlopen("libGL.so", RTLD_LAZY);
@@ -457,59 +607,89 @@ namespace pshtv {
 #include <GL/gl.h>
 #include <GL/glext.h>
 
-    PFNGLCREATESHADERPROC      glCreateShader;
-    PFNGLSHADERSOURCEPROC      glShaderSource;
-    PFNGLCOMPILESHADERPROC     glCompileShader;
-    PFNGLGETSHADERIVPROC       glGetShaderiv;
-    PFNGLGETSHADERINFOLOGPROC  glGetShaderInfoLog;
-    PFNGLCREATEPROGRAMPROC     glCreateProgram;
-    PFNGLATTACHSHADERPROC      glAttachShader;
-    PFNGLLINKPROGRAMPROC       glLinkProgram;
-    PFNGLGETPROGRAMIVPROC      glGetProgramiv;
-    PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog;
-    PFNGLDELETESHADERPROC      glDeleteShader;
-    PFNGLUSEPROGRAMPROC        glUseProgram;
+    typedef void (*PNFGLFLUSHPROC) (void);
+    typedef void (*PNFGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
+    typedef void (*PNFGLBEGINPROC) (GLenum mode);
+    typedef void (*PNFGLVERTEX2FPROC) (GLfloat x, GLfloat y);
+    typedef void (*PNFGLENDPROC) (void);
+    typedef void (*PNFGLTEXCOORD2FPROC) (GLfloat s, GLfloat t);
+    typedef void (*PNFGLCOLOR3FPROC) (GLfloat red, GLfloat green, GLfloat blue);
+    typedef void (*PNFGLCLEARCOLORPROC) (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha);
+    typedef void (*PNFGLCLEARPROC) (GLbitfield mask);
+    typedef void (*PNFGLMATRIXMODEPROC) (GLenum mode);
+    typedef void (*PNFGLLOADMATRIXFPROC) (const GLfloat * m);
+    typedef const GLubyte* (*PNFGLGETSTRINGPROC) (GLenum name);
 
-#define LOAD_GL_EXT(T, X) X = (T)load_gl_ext(#X)
-    void load_gl_exts() {
-        LOAD_GL_EXT(PFNGLCREATESHADERPROC,      glCreateShader);
-        LOAD_GL_EXT(PFNGLSHADERSOURCEPROC,      glShaderSource);
-        LOAD_GL_EXT(PFNGLCOMPILESHADERPROC,     glCompileShader);
-        LOAD_GL_EXT(PFNGLGETSHADERIVPROC,       glGetShaderiv);
-        LOAD_GL_EXT(PFNGLGETSHADERINFOLOGPROC,  glGetShaderInfoLog);
-        LOAD_GL_EXT(PFNGLCREATEPROGRAMPROC,     glCreateProgram);
-        LOAD_GL_EXT(PFNGLATTACHSHADERPROC,      glAttachShader);
-        LOAD_GL_EXT(PFNGLLINKPROGRAMPROC,       glLinkProgram);
-        LOAD_GL_EXT(PFNGLGETPROGRAMIVPROC,      glGetProgramiv);
-        LOAD_GL_EXT(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog);
-        LOAD_GL_EXT(PFNGLDELETESHADERPROC,      glDeleteShader);
-        LOAD_GL_EXT(PFNGLUSEPROGRAMPROC,        glUseProgram);
+
+
+    PNFGLFLUSHPROC             pglFlush;
+    PNFGLVIEWPORTPROC          pglViewport;
+    PNFGLGETSTRINGPROC         pglGetString;
+    PNFGLBEGINPROC             pglBegin;
+    PNFGLVERTEX2FPROC          pglVertex2f;
+    PNFGLENDPROC               pglEnd;
+    PNFGLTEXCOORD2FPROC        pglTexCoord2f;
+    PNFGLCOLOR3FPROC           pglColor3f;
+    PNFGLCLEARCOLORPROC        pglClearColor;
+    PNFGLCLEARPROC             pglClear;
+    PNFGLMATRIXMODEPROC        pglMatrixMode;
+    PNFGLLOADMATRIXFPROC       pglLoadMatrixf;
+    PFNGLCREATESHADERPROC      pglCreateShader;
+    PFNGLSHADERSOURCEPROC      pglShaderSource;
+    PFNGLCOMPILESHADERPROC     pglCompileShader;
+    PFNGLGETSHADERIVPROC       pglGetShaderiv;
+    PFNGLGETSHADERINFOLOGPROC  pglGetShaderInfoLog;
+    PFNGLCREATEPROGRAMPROC     pglCreateProgram;
+    PFNGLATTACHSHADERPROC      pglAttachShader;
+    PFNGLLINKPROGRAMPROC       pglLinkProgram;
+    PFNGLGETPROGRAMIVPROC      pglGetProgramiv;
+    PFNGLGETPROGRAMINFOLOGPROC pglGetProgramInfoLog;
+    PFNGLDELETESHADERPROC      pglDeleteShader;
+    PFNGLUSEPROGRAMPROC        pglUseProgram;
+
+#define LOAD_GL(T, X) p ## X = (T)load_gl(#X)
+    void load_gls() {
+        LOAD_GL(PNFGLFLUSHPROC,             glFlush);
+        LOAD_GL(PNFGLVIEWPORTPROC,          glViewport);
+        LOAD_GL(PNFGLGETSTRINGPROC,         glGetString);
+        LOAD_GL(PNFGLBEGINPROC,             glBegin);
+        LOAD_GL(PNFGLVERTEX2FPROC,          glVertex2f);
+        LOAD_GL(PNFGLENDPROC,               glEnd);
+        LOAD_GL(PNFGLTEXCOORD2FPROC,        glTexCoord2f);
+        LOAD_GL(PNFGLCOLOR3FPROC,           glColor3f);
+        LOAD_GL(PNFGLCLEARCOLORPROC,        glClearColor);
+        LOAD_GL(PNFGLCLEARPROC,             glClear);
+        LOAD_GL(PNFGLMATRIXMODEPROC,        glMatrixMode);
+        LOAD_GL(PNFGLLOADMATRIXFPROC,       glLoadMatrixf);
+        LOAD_GL(PFNGLCREATESHADERPROC,      glCreateShader);
+        LOAD_GL(PFNGLSHADERSOURCEPROC,      glShaderSource);
+        LOAD_GL(PFNGLCOMPILESHADERPROC,     glCompileShader);
+        LOAD_GL(PFNGLGETSHADERIVPROC,       glGetShaderiv);
+        LOAD_GL(PFNGLGETSHADERINFOLOGPROC,  glGetShaderInfoLog);
+        LOAD_GL(PFNGLCREATEPROGRAMPROC,     glCreateProgram);
+        LOAD_GL(PFNGLATTACHSHADERPROC,      glAttachShader);
+        LOAD_GL(PFNGLLINKPROGRAMPROC,       glLinkProgram);
+        LOAD_GL(PFNGLGETPROGRAMIVPROC,      glGetProgramiv);
+        LOAD_GL(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog);
+        LOAD_GL(PFNGLDELETESHADERPROC,      glDeleteShader);
+        LOAD_GL(PFNGLUSEPROGRAMPROC,        glUseProgram);
     }
-#undef LOAD_GL_EXT
-
-    // This part of Pishtov deals with OpenGL stuff. It deals with different
-    // drawing functions that the end user might use. It currently provides the
-    // following functions:
-    void fill_rect(float x, float y, float w, float h); // Draws a rectangle at x, y with dimensions w, h
-    void fill_style(float r, float g, float b); // Changes the color. Values for each channel are in the range [0; 255]
-    void fill_cricle(float x, float y, float r); // Draws a circle at x, y with radius r
-    void begin_draw();
-    void end_draw();
+#undef LOAD_GL
 
     unsigned int prog_solid;
     unsigned int prog_circle;
 
     unsigned int compile_shader(const char *src, GLenum type) {
-        unsigned int shader = glCreateShader(type);
+        unsigned int shader = pglCreateShader(type);
 
-        glShaderSource(shader, 1, &src, NULL);
-        glCompileShader(shader);
+        pglShaderSource(shader, 1, &src, NULL);
+        pglCompileShader(shader);
 
         int success;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        pglGetShaderiv(shader, GL_COMPILE_STATUS, &success);
         if (!success) {
             char info[512];
-            glGetShaderInfoLog(shader, 512, NULL, info);
+            pglGetShaderInfoLog(shader, 512, NULL, info);
             std::cerr << info << std::endl;
         }
 
@@ -517,58 +697,60 @@ namespace pshtv {
     }
 
     unsigned int simple_shader_prog(const char *vertex_src, const char *fragment_src) {
-        unsigned int prog = glCreateProgram();
+        unsigned int prog = pglCreateProgram();
 
         unsigned int vertex_shader = compile_shader(vertex_src, GL_VERTEX_SHADER);
         unsigned int fragment_shader = compile_shader(fragment_src, GL_FRAGMENT_SHADER);
 
-        glAttachShader(prog, vertex_shader);
-        glAttachShader(prog, fragment_shader);
-        glLinkProgram(prog);
+        pglAttachShader(prog, vertex_shader);
+        pglAttachShader(prog, fragment_shader);
+        pglLinkProgram(prog);
 
         int success;
-        glGetProgramiv(prog, GL_LINK_STATUS, &success);
+        pglGetProgramiv(prog, GL_LINK_STATUS, &success);
         if (!success) {
             char info[512];
-            glGetProgramInfoLog(prog, 512, NULL, info);
+            pglGetProgramInfoLog(prog, 512, NULL, info);
             std::cerr << info << std::endl;
         }
 
-        glDeleteShader(vertex_shader);
-        glDeleteShader(fragment_shader);
+        pglDeleteShader(vertex_shader);
+        pglDeleteShader(fragment_shader);
 
         return prog;
     }
 
     void fill_rect(float x, float y, float w, float h) {
-        glUseProgram(prog_solid);
+        pglUseProgram(prog_solid);
 
-        glBegin(GL_QUADS);
-        glVertex2f(x + 0, y + 0);
-        glVertex2f(x + w, y + 0);
-        glVertex2f(x + w, y + h);
-        glVertex2f(x + 0, y + h);
-        glEnd();
+        pglBegin(GL_QUADS);
+        pglVertex2f(x + 0, y + 0);
+        pglVertex2f(x + w, y + 0);
+        pglVertex2f(x + w, y + h);
+        pglVertex2f(x + 0, y + h);
+        pglEnd();
     }
 
     void fill_circle(float x, float y, float r) {
-        glUseProgram(prog_circle);
+        pglUseProgram(prog_circle);
 
-        glBegin(GL_QUADS);
-        glTexCoord2f(-1, -1); glVertex2f(x - r, y - r);
-        glTexCoord2f( 1, -1); glVertex2f(x + r, y - r);
-        glTexCoord2f( 1,  1); glVertex2f(x + r, y + r);
-        glTexCoord2f(-1,  1); glVertex2f(x - r, y + r);
-        glEnd();
+        pglBegin(GL_QUADS);
+        pglTexCoord2f(-1, -1); pglVertex2f(x - r, y - r);
+        pglTexCoord2f( 1, -1); pglVertex2f(x + r, y - r);
+        pglTexCoord2f( 1,  1); pglVertex2f(x + r, y + r);
+        pglTexCoord2f(-1,  1); pglVertex2f(x - r, y + r);
+        pglEnd();
     }
 
     void fill_style(float r, float g, float b) {
-        glColor3f(r, g, b);
+        pglColor3f(r, g, b);
     }
 
-    void begin_draw() {
-        glClearColor(1.0, 1.0, 1.0, 0.0);
-        glClear(GL_COLOR_BUFFER_BIT);
+    void redraw() {
+        pglViewport(0, 0, window_w, window_h);
+
+        pglClearColor(1.0, 1.0, 1.0, 0.0);
+        pglClear(GL_COLOR_BUFFER_BIT);
 
         float w = 2 / (float)window_w;
         float h = 2 / (float)window_h;
@@ -578,16 +760,16 @@ namespace pshtv {
              0,  0,  1,  0,
             -1,  1,  0,  1,
         };
-        glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(&m[0]);
-    }
+        pglMatrixMode(GL_PROJECTION);
+        pglLoadMatrixf(&m[0]);
 
-    void end_draw() {
+        draw();
+        pglFlush();
         swap_buffers();
     }
 
     void init_opengl() {
-        load_gl_exts();
+        load_gls();
 
         const char *vertex_src_solid = R"XXX(
             #version 110
@@ -632,12 +814,12 @@ namespace pshtv {
 int main() {
     pshtv::open_window("Igra", 800, 600);
     pshtv::init_opengl();
+
+
     while (true) {
         pshtv::handle_events();
         update();
-        pshtv::begin_draw();
-        draw();
-        pshtv::end_draw();
+        pshtv::redraw();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
