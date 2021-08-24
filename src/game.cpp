@@ -1,9 +1,11 @@
 #include "pishtov.h"
-using pshtv::fill_rect;
-using pshtv::fill_circle;
-using pshtv::fill_style;
 
 float my_x, my_y;
+
+void init() {
+    my_x = 300;
+    my_y = 300;
+}
 
 void update() {
     my_x += (mouse_x - my_x) / 10;

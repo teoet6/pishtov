@@ -56,6 +56,7 @@ void keydown(int key);
 void keyup(int key);
 void mousedown(int button);
 void mouseup(int button);
+void init();
 void update();
 void draw();
 float mouse_x, mouse_y;
@@ -808,6 +809,9 @@ namespace pshtv {
         prog_circle = simple_shader_prog(vertex_src_circle, fragment_src_circle);
     }
 }
+using pshtv::fill_rect;
+using pshtv::fill_circle;
+using pshtv::fill_style;
 
 // This part of Pishtov defines the main game loop.
 
@@ -815,7 +819,7 @@ int main() {
     pshtv::open_window("Igra", 800, 600);
     pshtv::init_opengl();
 
-
+    init();
     while (true) {
         pshtv::handle_events();
         update();
