@@ -1,10 +1,10 @@
 #include "pishtov.h"
 
-float my_x, my_y;
+float my_x;
+float my_y;
 
 void init() {
-    my_x = 300;
-    my_y = 300;
+    line_width = 2;
 }
 
 void update() {
@@ -14,7 +14,10 @@ void update() {
 
 void draw() {
     fill_style(0, 0, 1);
-    fill_circle(my_x, my_y, 20);
+    fill_rect(my_x, my_y, 30, 30);
+
+    fill_style(1, 0, 0);
+    fill_line(my_x, my_y, mouse_x, mouse_y);
 }
 
 void keydown(int key) { 

@@ -51,6 +51,7 @@ TODO In no particular order
 #include <cstdlib>
 #include <thread>
 #include <chrono>
+#include <cmath>
 
 void keydown(int key);
 void keyup(int key);
@@ -79,6 +80,8 @@ namespace pshtv {
     void fill_rect(float x, float y, float w, float h);
     void fill_circle(float x, float y, float r);
     void fill_style(float r, float g, float b);
+    float line_width = 1;
+    void fill_line(float x1, float y1, float x2, float y2);
     void redraw();
 
 #if defined(_WIN32) // Windows 32 or 64 bit
@@ -747,6 +750,24 @@ namespace pshtv {
         pglColor3f(r, g, b);
     }
 
+    // TODO Make this into a shader
+    void fill_line(float x1, float y1, float x2, float y2) {
+        float x0 = x2 - x1;
+        float y0 = y2 - y1;
+        float len = sqrt(x0 * x0 + y0 * y0);
+        float x3 = line_width * .5 * -y0 / len;
+        float y3 = line_width * .5 *  x0 / len;
+
+        pglUseProgram(prog_solid);
+
+        pglBegin(GL_QUADS);
+        pglVertex2f(x1 - x3, y1 - y3);
+        pglVertex2f(x1 + x3, y1 + y3);
+        pglVertex2f(x2 + x3, y2 + y3);
+        pglVertex2f(x2 - x3, y2 - y3);
+        pglEnd();
+    }
+
     void redraw() {
         pglViewport(0, 0, window_w, window_h);
 
@@ -812,6 +833,8 @@ namespace pshtv {
 using pshtv::fill_rect;
 using pshtv::fill_circle;
 using pshtv::fill_style;
+using pshtv::fill_line;
+using pshtv::line_width;
 
 // This part of Pishtov defines the main game loop.
 
