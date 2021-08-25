@@ -81,7 +81,7 @@ namespace pshtv {
     void fill_rect(float x, float y, float w, float h);
     void fill_circle(float x, float y, float r);
     void fill_ellipse(float x, float y, float rx, float ry);
-    void fill_style(float r, float g, float b);
+    void fill_color(unsigned int rgb);
     float line_width = 1;
     void fill_line(float x1, float y1, float x2, float y2);
     void redraw();
@@ -760,8 +760,12 @@ namespace pshtv {
         pglEnd();
     }
 
-    void fill_style(float r, float g, float b) {
-        pglColor3f(r, g, b);
+    void fill_color(unsigned int rgb) {
+        float b = rgb & 0xff;
+        float g = (rgb >> 8) & 0xff;
+        float r = rgb >> 16;
+
+        pglColor3f(r / 255, g / 255, b / 255);
     }
 
     // TODO Make this into a shader
@@ -847,7 +851,7 @@ namespace pshtv {
 using pshtv::fill_rect;
 using pshtv::fill_circle;
 using pshtv::fill_ellipse;
-using pshtv::fill_style;
+using pshtv::fill_color;
 using pshtv::fill_line;
 using pshtv::line_width;
 
