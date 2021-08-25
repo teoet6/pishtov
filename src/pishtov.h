@@ -31,9 +31,10 @@ compiling his game breaks this workflow.
 An extra extra goal is compiling to WASM and Android.
 
 TODO In no particular order
+    [ ] Make Pishtov a C library instead of a C++ one
     [X] Rectangles
-    [X] Circles
-    [ ] Arcs
+    [X] Circles and Ellipses
+    [ ] Arcs i.e. semicircles and semiellipses
     [X] Lines
     [ ] Images
     [ ] Text
@@ -79,6 +80,7 @@ namespace pshtv {
     // It defines the following functions:
     void fill_rect(float x, float y, float w, float h);
     void fill_circle(float x, float y, float r);
+    void fill_ellipse(float x, float y, float rx, float ry);
     void fill_style(float r, float g, float b);
     float line_width = 1;
     void fill_line(float x1, float y1, float x2, float y2);
@@ -724,6 +726,7 @@ namespace pshtv {
         return prog;
     }
 
+
     void fill_rect(float x, float y, float w, float h) {
         pglUseProgram(prog_solid);
 
@@ -743,6 +746,17 @@ namespace pshtv {
         pglTexCoord2f( 1, -1); pglVertex2f(x + r, y - r);
         pglTexCoord2f( 1,  1); pglVertex2f(x + r, y + r);
         pglTexCoord2f(-1,  1); pglVertex2f(x - r, y + r);
+        pglEnd();
+    }
+
+    void fill_ellipse(float x, float y, float rx, float ry) {
+        pglUseProgram(prog_circle);
+
+        pglBegin(GL_QUADS);
+        pglTexCoord2f(-1, -1); pglVertex2f(x - rx, y - ry);
+        pglTexCoord2f( 1, -1); pglVertex2f(x + rx, y - ry);
+        pglTexCoord2f( 1,  1); pglVertex2f(x + rx, y + ry);
+        pglTexCoord2f(-1,  1); pglVertex2f(x - rx, y + ry);
         pglEnd();
     }
 
@@ -832,6 +846,7 @@ namespace pshtv {
 }
 using pshtv::fill_rect;
 using pshtv::fill_circle;
+using pshtv::fill_ellipse;
 using pshtv::fill_style;
 using pshtv::fill_line;
 using pshtv::line_width;
