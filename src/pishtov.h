@@ -48,6 +48,9 @@ TODO In no particular order
     [ ] Android compile
 */
 
+#ifndef __PISHTOV_H
+#define __PISHTOV_H
+
 #include <iostream>
 #include <cstdlib>
 #include <thread>
@@ -869,3 +872,5 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
+
+#endif // __PISHTOV_H
