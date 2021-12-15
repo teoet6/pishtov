@@ -21,15 +21,15 @@ void draw() {
 
 }
 
-void keydown(int key) { 
-    std::cout << "Keydown " << key << std::endl;
+void keydown(int key) {
+    printf("Keydown %d\n", key);
 }
 
 void keyup(int key) { }
 
 void mousedown(int button) { }
 
-void mouseup(int button) { 
-    std::cout << "Mouse clicked at " << mouse_x << " " << mouse_y << " from " << window_w << " " << window_h << std::endl;
+void mouseup(int button) {
+    printf("Mouse clicked at %.0f %.0f from %.0f %.0f\n", mouse_x, mouse_y, window_w, window_h);
 }
 
