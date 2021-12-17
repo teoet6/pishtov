@@ -4,7 +4,6 @@ float my_x;
 float my_y;
 
 void init() {
-    line_width = 2;
 }
 
 void update() {
@@ -13,12 +12,7 @@ void update() {
 }
 
 void draw() {
-    fill_color(0x0000ff);
-    fill_ellipse(my_x, my_y, 30, 15);
-
-    fill_color(0xff0000);
-    fill_line(my_x, my_y, mouse_x, mouse_y);
-
+    fill_rect(my_x / window_w, my_y / window_h, 0.05, 0.05);
 }
 
 void keydown(int key) {

@@ -87,11 +87,13 @@ float window_w, window_h; // Automatically set to the window dimensions
 // The other part of the pishtov deals with actually drawing using OpenGL
 // It defines the following functions:
 void fill_rect(float x, float y, float w, float h);
+/*
 void fill_circle(float x, float y, float r);
 void fill_ellipse(float x, float y, float rx, float ry);
 void fill_color(unsigned int rgb);
 float line_width = 1;
 void fill_line(float x1, float y1, float x2, float y2);
+*/
 void pshtv_redraw();
 
 #if defined(_WIN32) // Windows 32 or 64 bit
@@ -648,8 +650,6 @@ typedef void (*PFNGLMATRIXMODEPROC) (GLenum mode);
 typedef void (*PFNGLLOADMATRIXFPROC) (const GLfloat * m);
 typedef const GLubyte* (*PFNGLGETSTRINGPROC) (GLenum name);
 
-
-
 PFNGLFLUSHPROC             pglFlush;
 PFNGLVIEWPORTPROC          pglViewport;
 PFNGLGETSTRINGPROC         pglGetString;
@@ -750,16 +750,29 @@ unsigned int pshtv_simple_shader_prog(const char *vertex_src, const char *fragme
 
 
 void fill_rect(float x, float y, float w, float h) {
-    pglUseProgram(pshtv_prog_solid);
+    GLuint vao, vbo;
 
-    pglBegin(GL_QUADS);
-    pglVertex2f(x + 0, y + 0);
-    pglVertex2f(x + w, y + 0);
-    pglVertex2f(x + w, y + h);
-    pglVertex2f(x + 0, y + h);
-    pglEnd();
+    const GLfloat rect[4][2] = {
+        { x    , y     },
+        { x + w, y     },
+        { x + w, y + h },
+        { x    , y + h },
+    };
+
+    pglGenVertexArrays(1, &vao);
+    pglBindVertexArray(vao);
+
+    pglGenBuffers(1, &vbo);
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    pglBufferData(GL_ARRAY_BUFFER, 8 * sizeof(GLfloat), rect, GL_STREAM_DRAW);
+
+    pglVertex
+
+    pglUseProgram(pshtv_prog_solid);
 }
 
+/*
 void fill_circle(float x, float y, float r) {
     pglUseProgram(pshtv_prog_circle);
 
@@ -807,6 +820,7 @@ void fill_line(float x1, float y1, float x2, float y2) {
     pglVertex2f(x2 - x3, y2 - y3);
     pglEnd();
 }
+*/
 
 void pshtv_redraw() {
     pglViewport(0, 0, window_w, window_h);
@@ -814,6 +828,7 @@ void pshtv_redraw() {
     pglClearColor(1.0, 1.0, 1.0, 0.0);
     pglClear(GL_COLOR_BUFFER_BIT);
 
+    /*
     float w = 2 / (float)window_w;
     float h = 2 / (float)window_h;
     float m[] = { // OpenGL wants the matrix transposed
@@ -824,6 +839,7 @@ void pshtv_redraw() {
     };
     pglMatrixMode(GL_PROJECTION);
     pglLoadMatrixf(&m[0]);
+    */
 
     draw();
     pglFlush();
@@ -834,24 +850,32 @@ void pshtv_init_opengl() {
     pshtv_load_gls();
 
     const char *vertex_src_solid = R"XXX(
-            #version 110
-            void main() {
-                gl_FrontColor = gl_Color;
-                gl_BackColor  = gl_Color;
-                gl_Position   = gl_ProjectionMatrix * gl_Vertex;
-            }
-        )XXX";
+        #version 150
+
+        in vec2 in_Position;
+
+        out vec3 ex_Color;
+
+        void main() {
+            gl_Position = vec4(in_Position, 0.0, 1.0);
+            ex_Color = vec4(0.0, 0.0, 1.0);
+        }
+    )XXX";
     const char *fragment_src_solid = R"XXX(
-            #version 110
-            void main() {
-                gl_FragColor = gl_Color;
-            }
-        )XXX";
+        #version 150
+
+        in vec3 ex_Color;
+
+        void main() {
+            gl_FragColor = vec4(ex_Color, 1.0);
+        }
+    )XXX";
     pshtv_prog_solid = pshtv_simple_shader_prog(vertex_src_solid, fragment_src_solid);
 
+    /*
     // TODO anti-aliasing
     const char *vertex_src_circle = R"XXX(
-            #version 110
+            #version 330
             void main() {
                 gl_FrontColor = gl_Color;
                 gl_BackColor  = gl_Color;
@@ -860,13 +884,14 @@ void pshtv_init_opengl() {
             }
         )XXX";
     const char *fragment_src_circle = R"XXX(
-            #version 110
+            #version 330
             void main() {
                 if (dot(gl_TexCoord[0].st, gl_TexCoord[0].st) >= 1.0)
                     discard;
                 gl_FragColor = gl_Color;
             }
         )XXX";
+    */
     pshtv_prog_circle = pshtv_simple_shader_prog(vertex_src_circle, fragment_src_circle);
 }
 // This part of Pishtov defines the main game loop.
