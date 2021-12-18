@@ -12,7 +12,7 @@ void update() {
 }
 
 void draw() {
-    fill_rect(my_x / window_w, my_y / window_h, 0.05, 0.05);
+    fill_rect(my_x, my_y, 30, 30);
 }
 
 void keydown(int key) {

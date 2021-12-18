@@ -639,73 +639,73 @@ void pshtv_msleep(int mseconds) {
 
 typedef void (*PFNGLFLUSHPROC) (void);
 typedef void (*PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
-typedef void (*PFNGLBEGINPROC) (GLenum mode);
-typedef void (*PFNGLVERTEX2FPROC) (GLfloat x, GLfloat y);
-typedef void (*PFNGLENDPROC) (void);
-typedef void (*PFNGLTEXCOORD2FPROC) (GLfloat s, GLfloat t);
-typedef void (*PFNGLCOLOR3FPROC) (GLfloat red, GLfloat green, GLfloat blue);
 typedef void (*PFNGLCLEARCOLORPROC) (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha);
 typedef void (*PFNGLCLEARPROC) (GLbitfield mask);
-typedef void (*PFNGLMATRIXMODEPROC) (GLenum mode);
-typedef void (*PFNGLLOADMATRIXFPROC) (const GLfloat * m);
-typedef const GLubyte* (*PFNGLGETSTRINGPROC) (GLenum name);
 
-PFNGLFLUSHPROC             pglFlush;
-PFNGLVIEWPORTPROC          pglViewport;
-PFNGLGETSTRINGPROC         pglGetString;
-PFNGLBEGINPROC             pglBegin;
-PFNGLVERTEX2FPROC          pglVertex2f;
-PFNGLENDPROC               pglEnd;
-PFNGLTEXCOORD2FPROC        pglTexCoord2f;
-PFNGLCOLOR3FPROC           pglColor3f;
-PFNGLCLEARCOLORPROC        pglClearColor;
-PFNGLCLEARPROC             pglClear;
-PFNGLMATRIXMODEPROC        pglMatrixMode;
-PFNGLLOADMATRIXFPROC       pglLoadMatrixf;
-PFNGLCREATESHADERPROC      pglCreateShader;
-PFNGLSHADERSOURCEPROC      pglShaderSource;
-PFNGLCOMPILESHADERPROC     pglCompileShader;
-PFNGLGETSHADERIVPROC       pglGetShaderiv;
-PFNGLGETSHADERINFOLOGPROC  pglGetShaderInfoLog;
-PFNGLCREATEPROGRAMPROC     pglCreateProgram;
-PFNGLATTACHSHADERPROC      pglAttachShader;
-PFNGLLINKPROGRAMPROC       pglLinkProgram;
-PFNGLGETPROGRAMIVPROC      pglGetProgramiv;
-PFNGLGETPROGRAMINFOLOGPROC pglGetProgramInfoLog;
-PFNGLDELETESHADERPROC      pglDeleteShader;
-PFNGLUSEPROGRAMPROC        pglUseProgram;
+PFNGLFLUSHPROC                   pglFlush;
+PFNGLVIEWPORTPROC                pglViewport;
+PFNGLDRAWARRAYSEXTPROC           pglDrawArrays;
+PFNGLCLEARCOLORPROC              pglClearColor;
+PFNGLCLEARPROC                   pglClear;
+PFNGLCREATESHADERPROC            pglCreateShader;
+PFNGLSHADERSOURCEPROC            pglShaderSource;
+PFNGLCOMPILESHADERPROC           pglCompileShader;
+PFNGLGETSHADERIVPROC             pglGetShaderiv;
+PFNGLGETSHADERINFOLOGPROC        pglGetShaderInfoLog;
+PFNGLCREATEPROGRAMPROC           pglCreateProgram;
+PFNGLATTACHSHADERPROC            pglAttachShader;
+PFNGLLINKPROGRAMPROC             pglLinkProgram;
+PFNGLGETPROGRAMIVPROC            pglGetProgramiv;
+PFNGLGETPROGRAMINFOLOGPROC       pglGetProgramInfoLog;
+PFNGLDELETESHADERPROC            pglDeleteShader;
+PFNGLUSEPROGRAMPROC              pglUseProgram;
+PFNGLGENVERTEXARRAYSPROC         pglGenVertexArrays;
+PFNGLBINDVERTEXARRAYPROC         pglBindVertexArray;
+PFNGLGENBUFFERSPROC              pglGenBuffers;
+PFNGLBINDBUFFERPROC              pglBindBuffer;
+PFNGLBUFFERDATAPROC              pglBufferData;
+PFNGLVERTEXATTRIBPOINTERPROC     pglVertexAttribPointer;
+PFNGLENABLEVERTEXATTRIBARRAYPROC pglEnableVertexAttribArray;
+PFNGLGETATTRIBLOCATIONPROC       pglGetAttribLocation;
+PFNGLGETUNIFORMLOCATIONPROC      pglGetUniformLocation;
+PFNGLUNIFORMMATRIX4FVPROC        pglUniformMatrix4fv;
 
 #define LOAD_GL(T, X) p ## X = (T)pshtv_load_gl(#X)
 void pshtv_load_gls() {
-    LOAD_GL(PFNGLFLUSHPROC,             glFlush);
-    LOAD_GL(PFNGLVIEWPORTPROC,          glViewport);
-    LOAD_GL(PFNGLGETSTRINGPROC,         glGetString);
-    LOAD_GL(PFNGLBEGINPROC,             glBegin);
-    LOAD_GL(PFNGLVERTEX2FPROC,          glVertex2f);
-    LOAD_GL(PFNGLENDPROC,               glEnd);
-    LOAD_GL(PFNGLTEXCOORD2FPROC,        glTexCoord2f);
-    LOAD_GL(PFNGLCOLOR3FPROC,           glColor3f);
-    LOAD_GL(PFNGLCLEARCOLORPROC,        glClearColor);
-    LOAD_GL(PFNGLCLEARPROC,             glClear);
-    LOAD_GL(PFNGLMATRIXMODEPROC,        glMatrixMode);
-    LOAD_GL(PFNGLLOADMATRIXFPROC,       glLoadMatrixf);
-    LOAD_GL(PFNGLCREATESHADERPROC,      glCreateShader);
-    LOAD_GL(PFNGLSHADERSOURCEPROC,      glShaderSource);
-    LOAD_GL(PFNGLCOMPILESHADERPROC,     glCompileShader);
-    LOAD_GL(PFNGLGETSHADERIVPROC,       glGetShaderiv);
-    LOAD_GL(PFNGLGETSHADERINFOLOGPROC,  glGetShaderInfoLog);
-    LOAD_GL(PFNGLCREATEPROGRAMPROC,     glCreateProgram);
-    LOAD_GL(PFNGLATTACHSHADERPROC,      glAttachShader);
-    LOAD_GL(PFNGLLINKPROGRAMPROC,       glLinkProgram);
-    LOAD_GL(PFNGLGETPROGRAMIVPROC,      glGetProgramiv);
-    LOAD_GL(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog);
-    LOAD_GL(PFNGLDELETESHADERPROC,      glDeleteShader);
-    LOAD_GL(PFNGLUSEPROGRAMPROC,        glUseProgram);
+    LOAD_GL(PFNGLFLUSHPROC,                   glFlush);
+    LOAD_GL(PFNGLVIEWPORTPROC,                glViewport);
+    LOAD_GL(PFNGLDRAWARRAYSEXTPROC,           glDrawArrays);
+    LOAD_GL(PFNGLCLEARCOLORPROC,              glClearColor);
+    LOAD_GL(PFNGLCLEARPROC,                   glClear);
+    LOAD_GL(PFNGLCREATESHADERPROC,            glCreateShader);
+    LOAD_GL(PFNGLSHADERSOURCEPROC,            glShaderSource);
+    LOAD_GL(PFNGLCOMPILESHADERPROC,           glCompileShader);
+    LOAD_GL(PFNGLGETSHADERIVPROC,             glGetShaderiv);
+    LOAD_GL(PFNGLGETSHADERINFOLOGPROC,        glGetShaderInfoLog);
+    LOAD_GL(PFNGLCREATEPROGRAMPROC,           glCreateProgram);
+    LOAD_GL(PFNGLATTACHSHADERPROC,            glAttachShader);
+    LOAD_GL(PFNGLLINKPROGRAMPROC,             glLinkProgram);
+    LOAD_GL(PFNGLGETPROGRAMIVPROC,            glGetProgramiv);
+    LOAD_GL(PFNGLGETPROGRAMINFOLOGPROC,       glGetProgramInfoLog);
+    LOAD_GL(PFNGLDELETESHADERPROC,            glDeleteShader);
+    LOAD_GL(PFNGLUSEPROGRAMPROC,              glUseProgram);
+    LOAD_GL(PFNGLGENVERTEXARRAYSPROC,         glGenVertexArrays);
+    LOAD_GL(PFNGLBINDVERTEXARRAYPROC,         glBindVertexArray);
+    LOAD_GL(PFNGLGENBUFFERSPROC,              glGenBuffers);
+    LOAD_GL(PFNGLBINDBUFFERPROC,              glBindBuffer);
+    LOAD_GL(PFNGLBUFFERDATAPROC,              glBufferData);
+    LOAD_GL(PFNGLVERTEXATTRIBPOINTERPROC,     glVertexAttribPointer);
+    LOAD_GL(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray);
+    LOAD_GL(PFNGLGETATTRIBLOCATIONPROC,       glGetAttribLocation);
+    LOAD_GL(PFNGLUNIFORMMATRIX4FVPROC,        glUniformMatrix4fv);
+    LOAD_GL(PFNGLGETUNIFORMLOCATIONPROC,      glGetUniformLocation);
 }
 #undef LOAD_GL
 
 unsigned int pshtv_prog_solid;
 unsigned int pshtv_prog_circle;
+
+float transform_matrix[4][4];
 
 unsigned int pshtv_compile_shader(const char *src, GLenum type) {
     unsigned int shader = pglCreateShader(type);
@@ -718,7 +718,7 @@ unsigned int pshtv_compile_shader(const char *src, GLenum type) {
     if (!success) {
         char info[512];
         pglGetShaderInfoLog(shader, 512, NULL, info);
-        eprintf("%s\n", info);
+        eprintf("%s\n%s\n", src, info);
     }
 
     return shader;
@@ -748,28 +748,48 @@ unsigned int pshtv_simple_shader_prog(const char *vertex_src, const char *fragme
     return prog;
 }
 
-
 void fill_rect(float x, float y, float w, float h) {
-    GLuint vao, vbo;
+    pglUseProgram(pshtv_prog_solid);
 
-    const GLfloat rect[4][2] = {
+    GLuint vao, vbo[2];
+    GLint in_pos, in_col, u_transform;
+
+    const GLfloat vertecies[4][2] = {
         { x    , y     },
         { x + w, y     },
         { x + w, y + h },
         { x    , y + h },
     };
 
+    const GLfloat colors[4][3] = {
+        { 0.0, 0.0, 1.0 },
+        { 0.0, 0.0, 1.0 },
+        { 0.0, 0.0, 1.0 },
+        { 0.0, 0.0, 1.0 },
+    };
+
     pglGenVertexArrays(1, &vao);
     pglBindVertexArray(vao);
 
-    pglGenBuffers(1, &vbo);
-    pglBindBuffer(GL_ARRAY_BUFFER, vbo);
+    pglGenBuffers(2, vbo);
 
-    pglBufferData(GL_ARRAY_BUFFER, 8 * sizeof(GLfloat), rect, GL_STREAM_DRAW);
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(vertecies), vertecies, GL_STREAM_DRAW);
+    in_pos = pglGetAttribLocation(pshtv_prog_solid, "in_pos");
+    pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    pglEnableVertexAttribArray(in_pos);
 
-    pglVertex
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STREAM_DRAW);
+    in_col = pglGetAttribLocation(pshtv_prog_solid, "in_col");
+    pglVertexAttribPointer(in_col, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    pglEnableVertexAttribArray(in_col);
 
-    pglUseProgram(pshtv_prog_solid);
+    u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
+    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)transform_matrix);
+    pglEnableVertexAttribArray(u_transform);
+
+    pglDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
 /*
@@ -828,18 +848,12 @@ void pshtv_redraw() {
     pglClearColor(1.0, 1.0, 1.0, 0.0);
     pglClear(GL_COLOR_BUFFER_BIT);
 
-    /*
-    float w = 2 / (float)window_w;
-    float h = 2 / (float)window_h;
-    float m[] = { // OpenGL wants the matrix transposed
-        w,  0,  0,  0,
-        0, -h,  0,  0,
-        0,  0,  1,  0,
-        -1,  1,  0,  1,
-    };
-    pglMatrixMode(GL_PROJECTION);
-    pglLoadMatrixf(&m[0]);
-    */
+    float q = 2 / window_w;
+    float p = 2 / window_h;
+    transform_matrix[0][0] = q; transform_matrix[0][1] =  0; transform_matrix[0][2] = 0; transform_matrix[0][3] = -1;
+    transform_matrix[1][0] = 0; transform_matrix[1][1] = -p; transform_matrix[1][2] = 0; transform_matrix[1][3] =  1;
+    transform_matrix[2][0] = 0; transform_matrix[2][1] =  0; transform_matrix[2][2] = 1; transform_matrix[2][3] =  0;
+    transform_matrix[3][0] = 0; transform_matrix[3][1] =  0; transform_matrix[3][2] = 0; transform_matrix[3][3] =  1;
 
     draw();
     pglFlush();
@@ -850,24 +864,27 @@ void pshtv_init_opengl() {
     pshtv_load_gls();
 
     const char *vertex_src_solid = R"XXX(
-        #version 150
+        #version 330
 
-        in vec2 in_Position;
+        in vec2 in_pos;
+        in vec3 in_col;
 
-        out vec3 ex_Color;
+        uniform mat4 u_transform;
+
+        out vec3 ex_col;
 
         void main() {
-            gl_Position = vec4(in_Position, 0.0, 1.0);
-            ex_Color = vec4(0.0, 0.0, 1.0);
+            gl_Position = u_transform * vec4(in_pos, 0.0, 1.0);
+            ex_col = in_col;
         }
     )XXX";
     const char *fragment_src_solid = R"XXX(
-        #version 150
+        #version 330
 
-        in vec3 ex_Color;
+        in vec3 ex_col;
 
         void main() {
-            gl_FragColor = vec4(ex_Color, 1.0);
+            gl_FragColor = vec4(ex_col, 1.0);
         }
     )XXX";
     pshtv_prog_solid = pshtv_simple_shader_prog(vertex_src_solid, fragment_src_solid);
@@ -891,8 +908,8 @@ void pshtv_init_opengl() {
                 gl_FragColor = gl_Color;
             }
         )XXX";
-    */
     pshtv_prog_circle = pshtv_simple_shader_prog(vertex_src_circle, fragment_src_circle);
+    */
 }
 // This part of Pishtov defines the main game loop.
 
