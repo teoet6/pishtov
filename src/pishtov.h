@@ -86,14 +86,15 @@ float window_w, window_h; // Automatically set to the window dimensions
 
 // The other part of the pishtov deals with actually drawing using OpenGL
 // It defines the following functions:
-void fill_rect(float x, float y, float w, float h);
-/*
-void fill_circle(float x, float y, float r);
+float transform_matrix[4][4];
+float fill_color[4];
+
+void fill_poly(int count, const float* vertecies);
 void fill_ellipse(float x, float y, float rx, float ry);
-void fill_color(unsigned int rgb);
+void fill_rect(float x, float y, float w, float h);
+void fill_circle(float x, float y, float r);
 float line_width = 1;
 void fill_line(float x1, float y1, float x2, float y2);
-*/
 void pshtv_redraw();
 
 #if defined(_WIN32) // Windows 32 or 64 bit
@@ -669,6 +670,7 @@ PFNGLENABLEVERTEXATTRIBARRAYPROC pglEnableVertexAttribArray;
 PFNGLGETATTRIBLOCATIONPROC       pglGetAttribLocation;
 PFNGLGETUNIFORMLOCATIONPROC      pglGetUniformLocation;
 PFNGLUNIFORMMATRIX4FVPROC        pglUniformMatrix4fv;
+PFNGLUNIFORM4FVPROC              pglUniform4fv;
 
 #define LOAD_GL(T, X) p ## X = (T)pshtv_load_gl(#X)
 void pshtv_load_gls() {
@@ -699,13 +701,12 @@ void pshtv_load_gls() {
     LOAD_GL(PFNGLGETATTRIBLOCATIONPROC,       glGetAttribLocation);
     LOAD_GL(PFNGLUNIFORMMATRIX4FVPROC,        glUniformMatrix4fv);
     LOAD_GL(PFNGLGETUNIFORMLOCATIONPROC,      glGetUniformLocation);
+    LOAD_GL(PFNGLUNIFORM4FVPROC,              glUniform4fv);
 }
 #undef LOAD_GL
 
 unsigned int pshtv_prog_solid;
-unsigned int pshtv_prog_circle;
-
-float transform_matrix[4][4];
+unsigned int pshtv_prog_ellipse;
 
 unsigned int pshtv_compile_shader(const char *src, GLenum type) {
     unsigned int shader = pglCreateShader(type);
@@ -748,24 +749,52 @@ unsigned int pshtv_simple_shader_prog(const char *vertex_src, const char *fragme
     return prog;
 }
 
-void fill_rect(float x, float y, float w, float h) {
+void fill_poly(int count, const float *vertecies) {
     pglUseProgram(pshtv_prog_solid);
 
+    GLuint vao, vbo;
+    GLint in_pos, u_col, u_transform;
+
+    pglGenVertexArrays(1, &vao);
+    pglBindVertexArray(vao);
+
+    pglGenBuffers(1, &vbo);
+
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo);
+    pglBufferData(GL_ARRAY_BUFFER, count * 2 * sizeof(float), vertecies, GL_STREAM_DRAW);
+    in_pos = pglGetAttribLocation(pshtv_prog_solid, "in_pos");
+    pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    pglEnableVertexAttribArray(in_pos);
+
+    u_col = pglGetUniformLocation(pshtv_prog_solid, "u_col");
+    pglUniform4fv(u_col, 1, (const float*)fill_color);
+    pglEnableVertexAttribArray(u_col);
+
+    u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
+    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)transform_matrix);
+    pglEnableVertexAttribArray(u_transform);
+
+    pglDrawArrays(GL_TRIANGLE_FAN, 0, count);
+}
+
+void fill_ellipse(float x, float y, float rx, float ry) {
+    pglUseProgram(pshtv_prog_ellipse);
+
     GLuint vao, vbo[2];
-    GLint in_pos, in_col, u_transform;
+    GLint in_pos, in_corner, u_col, u_transform;
 
     const GLfloat vertecies[4][2] = {
-        { x    , y     },
-        { x + w, y     },
-        { x + w, y + h },
-        { x    , y + h },
+        { x - rx, y - ry },
+        { x + rx, y - ry },
+        { x + rx, y + ry },
+        { x - rx, y + ry },
     };
 
-    const GLfloat colors[4][3] = {
-        { 0.0, 0.0, 1.0 },
-        { 0.0, 0.0, 1.0 },
-        { 0.0, 0.0, 1.0 },
-        { 0.0, 0.0, 1.0 },
+    const GLfloat corners[4][2] = {
+        { -1, -1 },
+        { +1, -1 },
+        { +1, +1 },
+        { -1, +1 },
     };
 
     pglGenVertexArrays(1, &vao);
@@ -775,72 +804,59 @@ void fill_rect(float x, float y, float w, float h) {
 
     pglBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     pglBufferData(GL_ARRAY_BUFFER, sizeof(vertecies), vertecies, GL_STREAM_DRAW);
-    in_pos = pglGetAttribLocation(pshtv_prog_solid, "in_pos");
+    in_pos = pglGetAttribLocation(pshtv_prog_ellipse, "in_pos");
     pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, 0, 0);
     pglEnableVertexAttribArray(in_pos);
 
     pglBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    pglBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STREAM_DRAW);
-    in_col = pglGetAttribLocation(pshtv_prog_solid, "in_col");
-    pglVertexAttribPointer(in_col, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    pglEnableVertexAttribArray(in_col);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STREAM_DRAW);
+    in_corner = pglGetAttribLocation(pshtv_prog_ellipse, "in_corner");
+    pglVertexAttribPointer(in_corner, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    pglEnableVertexAttribArray(in_corner);
 
-    u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
+    u_col = pglGetUniformLocation(pshtv_prog_ellipse, "u_col");
+    pglUniform4fv(u_col, 1, (const float*)fill_color);
+    pglEnableVertexAttribArray(u_col);
+
+    u_transform = pglGetUniformLocation(pshtv_prog_ellipse, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
     pglDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
-/*
+void fill_rect(float x, float y, float w, float h) {
+    const float vertecies[4][2] = {
+        { x    , y     },
+        { x + w, y     },
+        { x + w, y + h },
+        { x    , y + h },
+    };
+
+    fill_poly(4, (const float*)vertecies);
+}
+
 void fill_circle(float x, float y, float r) {
-    pglUseProgram(pshtv_prog_circle);
-
-    pglBegin(GL_QUADS);
-    pglTexCoord2f(-1, -1); pglVertex2f(x - r, y - r);
-    pglTexCoord2f( 1, -1); pglVertex2f(x + r, y - r);
-    pglTexCoord2f( 1,  1); pglVertex2f(x + r, y + r);
-    pglTexCoord2f(-1,  1); pglVertex2f(x - r, y + r);
-    pglEnd();
-}
-
-void fill_ellipse(float x, float y, float rx, float ry) {
-    pglUseProgram(pshtv_prog_circle);
-
-    pglBegin(GL_QUADS);
-    pglTexCoord2f(-1, -1); pglVertex2f(x - rx, y - ry);
-    pglTexCoord2f( 1, -1); pglVertex2f(x + rx, y - ry);
-    pglTexCoord2f( 1,  1); pglVertex2f(x + rx, y + ry);
-    pglTexCoord2f(-1,  1); pglVertex2f(x - rx, y + ry);
-    pglEnd();
-}
-
-void fill_color(unsigned int rgb) {
-    float b = rgb & 0xff;
-    float g = (rgb >> 8) & 0xff;
-    float r = rgb >> 16;
-
-    pglColor3f(r / 255, g / 255, b / 255);
+    fill_ellipse(x, y, r, r);
 }
 
 // TODO Make this into a shader
 void fill_line(float x1, float y1, float x2, float y2) {
-    float x0 = x2 - x1;
-    float y0 = y2 - y1;
-    float len = sqrt(x0 * x0 + y0 * y0);
-    float x3 = line_width * .5 * -y0 / len;
-    float y3 = line_width * .5 *  x0 / len;
+    const float x0 = x2 - x1;
+    const float y0 = y2 - y1;
+    const float len = sqrt(x0 * x0 + y0 * y0);
+    const float x3 = line_width * .5 * -y0 / len;
+    const float y3 = line_width * .5 *  x0 / len;
 
-    pglUseProgram(pshtv_prog_solid);
+    const float vertecies[4][2] = {
+        { x1 - x3, y1 - y3 },
+        { x1 + x3, y1 + y3 },
+        { x2 + x3, y2 + y3 },
+        { x2 - x3, y2 - y3 },
+    };
 
-    pglBegin(GL_QUADS);
-    pglVertex2f(x1 - x3, y1 - y3);
-    pglVertex2f(x1 + x3, y1 + y3);
-    pglVertex2f(x2 + x3, y2 + y3);
-    pglVertex2f(x2 - x3, y2 - y3);
-    pglEnd();
+    fill_poly(4, (const float*)vertecies);
 }
-*/
 
 void pshtv_redraw() {
     pglViewport(0, 0, window_w, window_h);
@@ -855,6 +871,8 @@ void pshtv_redraw() {
     transform_matrix[2][0] = 0; transform_matrix[2][1] =  0; transform_matrix[2][2] = 1; transform_matrix[2][3] =  0;
     transform_matrix[3][0] = 0; transform_matrix[3][1] =  0; transform_matrix[3][2] = 0; transform_matrix[3][3] =  1;
 
+    fill_color[0] = 0; fill_color[1] = 0; fill_color[2] = 1; fill_color[3] = 1;
+
     draw();
     pglFlush();
     pshtv_swap_buffers();
@@ -867,49 +885,58 @@ void pshtv_init_opengl() {
         #version 330
 
         in vec2 in_pos;
-        in vec3 in_col;
 
         uniform mat4 u_transform;
 
-        out vec3 ex_col;
-
         void main() {
             gl_Position = u_transform * vec4(in_pos, 0.0, 1.0);
-            ex_col = in_col;
         }
     )XXX";
     const char *fragment_src_solid = R"XXX(
         #version 330
 
-        in vec3 ex_col;
+        uniform vec4 u_col;
 
         void main() {
-            gl_FragColor = vec4(ex_col, 1.0);
+            gl_FragColor = u_col;
         }
     )XXX";
     pshtv_prog_solid = pshtv_simple_shader_prog(vertex_src_solid, fragment_src_solid);
 
-    /*
     // TODO anti-aliasing
-    const char *vertex_src_circle = R"XXX(
-            #version 330
-            void main() {
-                gl_FrontColor = gl_Color;
-                gl_BackColor  = gl_Color;
-                gl_TexCoord[0] = gl_MultiTexCoord0;
-                gl_Position   = gl_ProjectionMatrix * gl_Vertex;
+    const char *vertex_src_ellipse = R"XXX(
+        #version 330
+
+        in vec2 in_pos;
+        in vec2 in_corner;
+
+        out vec2 ex_corner;
+
+        uniform mat4 u_transform;
+
+        void main() {
+            gl_Position = u_transform * vec4(in_pos, 0.0, 1.0);
+            ex_corner = in_corner;
+        }
+    )XXX";
+    const char *fragment_src_ellipse = R"XXX(
+        #version 330
+
+        in vec2 ex_corner;
+
+        uniform vec4 u_col;
+
+        void main() {
+            if (ex_corner.x == 0) {
+                gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+                return;
             }
-        )XXX";
-    const char *fragment_src_circle = R"XXX(
-            #version 330
-            void main() {
-                if (dot(gl_TexCoord[0].st, gl_TexCoord[0].st) >= 1.0)
-                    discard;
-                gl_FragColor = gl_Color;
-            }
-        )XXX";
-    pshtv_prog_circle = pshtv_simple_shader_prog(vertex_src_circle, fragment_src_circle);
-    */
+            if (dot(ex_corner, ex_corner) > 1.0)
+                discard;
+            gl_FragColor = u_col;
+        }
+    )XXX";
+    pshtv_prog_ellipse = pshtv_simple_shader_prog(vertex_src_ellipse, fragment_src_ellipse);
 }
 // This part of Pishtov defines the main game loop.
 
