@@ -13,12 +13,10 @@ void update() {
 }
 
 void draw() {
-    fill_color(0x0000ff);
-    fill_ellipse(my_x, my_y, 30, 15);
+    fill_circle(my_x, my_y, 15);
 
-    fill_color(0xff0000);
+    fill_color[0] = 1; fill_color[1] = 0; fill_color[2] = 0;
     fill_line(my_x, my_y, mouse_x, mouse_y);
-
 }
 
 void keydown(int key) {
