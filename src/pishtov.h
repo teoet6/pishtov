@@ -38,7 +38,7 @@ TODO In no particular order
     [X] Lines
     [ ] Images
     [ ] Text
-    [ ] Translation and rotation of the canvas
+    [ ] Translation, scaling and rotation of the canvas
     [ ] OS-independent network-programming
     [ ] 3D graphics
     [ ] Shaders
@@ -642,7 +642,10 @@ typedef void (*PFNGLFLUSHPROC) (void);
 typedef void (*PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
 typedef void (*PFNGLCLEARCOLORPROC) (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha);
 typedef void (*PFNGLCLEARPROC) (GLbitfield mask);
+typedef void (*PFNGLENABLEPROC) (GLenum cap);
+typedef void (*PFNGLBLENDFUNCPROC) (GLenum sfactor, GLenum dfactor);
 
+PFNGLENABLEPROC                  pglEnable;
 PFNGLFLUSHPROC                   pglFlush;
 PFNGLVIEWPORTPROC                pglViewport;
 PFNGLDRAWARRAYSEXTPROC           pglDrawArrays;
@@ -671,9 +674,11 @@ PFNGLGETATTRIBLOCATIONPROC       pglGetAttribLocation;
 PFNGLGETUNIFORMLOCATIONPROC      pglGetUniformLocation;
 PFNGLUNIFORMMATRIX4FVPROC        pglUniformMatrix4fv;
 PFNGLUNIFORM4FVPROC              pglUniform4fv;
+PFNGLBLENDFUNCPROC               pglBlendFunc;
 
 #define LOAD_GL(T, X) p ## X = (T)pshtv_load_gl(#X)
 void pshtv_load_gls() {
+    LOAD_GL(PFNGLENABLEPROC,                  glEnable);
     LOAD_GL(PFNGLFLUSHPROC,                   glFlush);
     LOAD_GL(PFNGLVIEWPORTPROC,                glViewport);
     LOAD_GL(PFNGLDRAWARRAYSEXTPROC,           glDrawArrays);
@@ -702,6 +707,7 @@ void pshtv_load_gls() {
     LOAD_GL(PFNGLUNIFORMMATRIX4FVPROC,        glUniformMatrix4fv);
     LOAD_GL(PFNGLGETUNIFORMLOCATIONPROC,      glGetUniformLocation);
     LOAD_GL(PFNGLUNIFORM4FVPROC,              glUniform4fv);
+    LOAD_GL(PFNGLBLENDFUNCPROC,               glBlendFunc);
 }
 #undef LOAD_GL
 
@@ -880,6 +886,9 @@ void pshtv_redraw() {
 
 void pshtv_init_opengl() {
     pshtv_load_gls();
+
+    pglEnable(GL_BLEND);
+    pglBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     const char *vertex_src_solid = R"XXX(
         #version 330
