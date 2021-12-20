@@ -7,9 +7,7 @@ int is_button_pressed[10];
 
 float start_x, start_y;
 
-void init() {
-    line_width = 2;
-}
+void init() { }
 
 void update() {
     my_x += (mouse_x - my_x) / 10;
@@ -29,11 +27,11 @@ void fill_color_hex(uint32_t hex) {
 }
 
 void draw() {
-    fill_color_hex(0xff0000);
+    fill_color_hex(0x0000ff);
     fill_circle(my_x, my_y, 15);
 
     fill_color_hex(0xff0000);
-    fill_line(my_x, my_y, mouse_x, mouse_y);
+    fill_line(my_x, my_y, mouse_x, mouse_y, 2);
 
     if (is_button_pressed[1]) {
         fill_color_hex(0x8000ffff);

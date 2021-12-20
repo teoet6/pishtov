@@ -93,8 +93,7 @@ void fill_poly(int count, const float* vertecies);
 void fill_ellipse(float x, float y, float rx, float ry);
 void fill_rect(float x, float y, float w, float h);
 void fill_circle(float x, float y, float r);
-float line_width = 1;
-void fill_line(float x1, float y1, float x2, float y2);
+void fill_line(float x1, float y1, float x2, float y2, float w);
 void pshtv_redraw();
 
 #if defined(_WIN32) // Windows 32 or 64 bit
@@ -847,12 +846,12 @@ void fill_circle(float x, float y, float r) {
 }
 
 // TODO Make this into a shader
-void fill_line(float x1, float y1, float x2, float y2) {
+void fill_line(float x1, float y1, float x2, float y2, float w) {
     const float x0 = x2 - x1;
     const float y0 = y2 - y1;
     const float len = sqrt(x0 * x0 + y0 * y0);
-    const float x3 = line_width * .5 * -y0 / len;
-    const float y3 = line_width * .5 *  x0 / len;
+    const float x3 = w * .5 * -y0 / len;
+    const float y3 = w * .5 *  x0 / len;
 
     const float vertecies[4][2] = {
         { x1 - x3, y1 - y3 },
