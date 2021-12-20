@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Theodor Totev - teoet6
 /*
-Pishtov is a C++ header that mimics Yashu's JS Pishtov. It tries not only
-to be faster by being written in C++ but to also be more powerful.
+Pishtov is a C header that mimics Yashu's JS Pishtov. It tries not only
+to be faster by being written in C but to also be more powerful.
 
 The point of the JS Pishtov is to remove the boilerplate from game programming
 and thus make it easy to teach children programming. The JS Pishtov is very
@@ -24,7 +24,7 @@ An extra goal is being able to be compiled in a default Code::Block Windows
 install i.e. without changing any linker or compiler settings. This is
 important in order to retain the no-boilerplate policy of the JS Pishtov.
 Originally all you had to do is edit game.js and open start.html in a browser.
-Similarly all you should do with the C++ Pishtov is edit game.cpp, compile and
+Similarly all you should do with the C Pishtov is edit game.c, compile and
 run. Making the end-user (who is possibly a child) edit linker settings before
 compiling his game breaks this workflow.
 
@@ -73,7 +73,7 @@ void draw();
 // This part of Pishtov deals with OS-specific stuff. This includes opening
 // a window, making an OpenGL context for said window, processing keyboard
 // and mouse input, swapping the buffers, providing functions that aren't
-// in the C++ standard library and more. You need to have the following
+// in the C standard library and more. You need to have the following
 // functions defined for each OS:
 void pshtv_open_window(const char *name, int w, int h); // Open a window.
 void pshtv_handle_events(); // Ask the OS for new events and react accordingly.
@@ -85,7 +85,7 @@ float mouse_x, mouse_y; // Automatically set to the mouse position on the window
 float window_w, window_h; // Automatically set to the window dimensions
 
 // The other part of the pishtov deals with actually drawing using OpenGL
-// It defines the following functions:
+// It defines the following functions and variables:
 float transform_matrix[4][4];
 float fill_color[4];
 
