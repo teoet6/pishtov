@@ -663,8 +663,10 @@ PFNGLGETPROGRAMINFOLOGPROC       pglGetProgramInfoLog;
 PFNGLDELETESHADERPROC            pglDeleteShader;
 PFNGLUSEPROGRAMPROC              pglUseProgram;
 PFNGLGENVERTEXARRAYSPROC         pglGenVertexArrays;
+PFNGLDELETEVERTEXARRAYSPROC      pglDeleteVertexArrays;
 PFNGLBINDVERTEXARRAYPROC         pglBindVertexArray;
 PFNGLGENBUFFERSPROC              pglGenBuffers;
+PFNGLDELETEBUFFERSPROC           pglDeleteBuffers;
 PFNGLBINDBUFFERPROC              pglBindBuffer;
 PFNGLBUFFERDATAPROC              pglBufferData;
 PFNGLVERTEXATTRIBPOINTERPROC     pglVertexAttribPointer;
@@ -696,8 +698,10 @@ void pshtv_load_gls() {
     LOAD_GL(PFNGLDELETESHADERPROC,            glDeleteShader);
     LOAD_GL(PFNGLUSEPROGRAMPROC,              glUseProgram);
     LOAD_GL(PFNGLGENVERTEXARRAYSPROC,         glGenVertexArrays);
+    LOAD_GL(PFNGLDELETEVERTEXARRAYSPROC,      glDeleteVertexArrays);
     LOAD_GL(PFNGLBINDVERTEXARRAYPROC,         glBindVertexArray);
     LOAD_GL(PFNGLGENBUFFERSPROC,              glGenBuffers);
+    LOAD_GL(PFNGLDELETEBUFFERSPROC,           glDeleteBuffers);
     LOAD_GL(PFNGLBINDBUFFERPROC,              glBindBuffer);
     LOAD_GL(PFNGLBUFFERDATAPROC,              glBufferData);
     LOAD_GL(PFNGLVERTEXATTRIBPOINTERPROC,     glVertexAttribPointer);
@@ -780,6 +784,9 @@ void fill_poly(int count, const float *vertecies) {
     pglEnableVertexAttribArray(u_transform);
 
     pglDrawArrays(GL_TRIANGLE_FAN, 0, count);
+
+    pglDeleteBuffers(1, &vbo);
+    pglDeleteVertexArrays(1, &vao);
 }
 
 void fill_ellipse(float x, float y, float rx, float ry) {
@@ -828,6 +835,9 @@ void fill_ellipse(float x, float y, float rx, float ry) {
     pglEnableVertexAttribArray(u_transform);
 
     pglDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+    pglDeleteBuffers(2, vbo);
+    pglDeleteVertexArrays(1, &vao);
 }
 
 void fill_rect(float x, float y, float w, float h) {
@@ -890,7 +900,7 @@ void pshtv_init_opengl() {
     pglBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     const char *vertex_src_solid = R"XXX(
-        #version 330
+        #version 130
 
         in vec2 in_pos;
 
@@ -901,7 +911,7 @@ void pshtv_init_opengl() {
         }
     )XXX";
     const char *fragment_src_solid = R"XXX(
-        #version 330
+        #version 130
 
         uniform vec4 u_col;
 
@@ -913,7 +923,7 @@ void pshtv_init_opengl() {
 
     // TODO anti-aliasing
     const char *vertex_src_ellipse = R"XXX(
-        #version 330
+        #version 130
 
         in vec2 in_pos;
         in vec2 in_corner;
@@ -928,7 +938,7 @@ void pshtv_init_opengl() {
         }
     )XXX";
     const char *fragment_src_ellipse = R"XXX(
-        #version 330
+        #version 130
 
         in vec2 ex_corner;
 
