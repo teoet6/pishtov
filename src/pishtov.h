@@ -38,7 +38,7 @@ TODO In no particular order
     [X] Lines
     [ ] Images
     [ ] Text
-    [ ] Translation, scaling and rotation of the canvas
+    [X] Translation, scaling and rotation of the canvas
     [ ] OS-independent network-programming
     [ ] 3D graphics
     [ ] Shaders
@@ -57,6 +57,7 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
@@ -94,6 +95,9 @@ void fill_ellipse(float x, float y, float rx, float ry);
 void fill_rect(float x, float y, float w, float h);
 void fill_circle(float x, float y, float r);
 void fill_line(float x1, float y1, float x2, float y2, float w);
+void translate(float x, float y);
+void scale(float x, float y);
+void rotate(float a);
 void pshtv_redraw();
 
 #if defined(_WIN32) // Windows 32 or 64 bit
@@ -264,11 +268,11 @@ void pshtv_msleep(int mseconds) {
 
 Display *display;
 Window window;
-int screen_id;
-GLXContext context;
 Atom atom_wm_delete_window;
 
 void pshtv_open_window(const char *name, int w, int h) {
+    int screen_id;
+    GLXContext context;
 
     display = XOpenDisplay(NULL);
     if (display == NULL) {
@@ -873,18 +877,64 @@ void fill_line(float x1, float y1, float x2, float y2, float w) {
     fill_poly(4, (const float*)vertecies);
 }
 
+void pshtv_mul_matrix4(float a[4][4], float b[4][4]) {
+    float c[4][4] = {};
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            for (int g = 0; g < 4; ++g)
+                c[i][j] += a[i][g] * b[g][j];
+    memcpy(a, c, sizeof(float) * 4 * 4);
+}
+
+void translate(float x, float y) {
+    float translate_matrix[4][4] = {
+        { 1, 0, 0, x },
+        { 0, 1, 0, y },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 },
+    };
+    pshtv_mul_matrix4(transform_matrix, translate_matrix);
+}
+
+void scale(float x, float y) {
+    float scale_matrix[4][4] = {
+        { x, 0, 0, 0 },
+        { 0, y, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 },
+    };
+    pshtv_mul_matrix4(transform_matrix, scale_matrix);
+}
+
+void rotate(float a) {
+    float s = sin(a);
+    float c = cos(a);
+    float rotate_matrix[4][4] = {
+        { c, -s, 0, 0 },
+        { s,  c, 0, 0 },
+        { 0,  0, 1, 0 },
+        { 0,  0, 0, 1 },
+    };
+    pshtv_mul_matrix4(transform_matrix, rotate_matrix);
+}
+
 void pshtv_redraw() {
     pglViewport(0, 0, window_w, window_h);
 
     pglClearColor(1.0, 1.0, 1.0, 0.0);
     pglClear(GL_COLOR_BUFFER_BIT);
 
+
+
     float q = 2 / window_w;
     float p = 2 / window_h;
-    transform_matrix[0][0] = q; transform_matrix[0][1] =  0; transform_matrix[0][2] = 0; transform_matrix[0][3] = -1;
-    transform_matrix[1][0] = 0; transform_matrix[1][1] = -p; transform_matrix[1][2] = 0; transform_matrix[1][3] =  1;
-    transform_matrix[2][0] = 0; transform_matrix[2][1] =  0; transform_matrix[2][2] = 1; transform_matrix[2][3] =  0;
-    transform_matrix[3][0] = 0; transform_matrix[3][1] =  0; transform_matrix[3][2] = 0; transform_matrix[3][3] =  1;
+
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            transform_matrix[i][j] = i == j ? 1 : 0;
+
+    translate(-1, 1);
+    scale(2 / window_w, -2 / window_h);
 
     fill_color[0] = 0; fill_color[1] = 0; fill_color[2] = 1; fill_color[3] = 1;
 
@@ -956,6 +1006,7 @@ void pshtv_init_opengl() {
     )XXX";
     pshtv_prog_ellipse = pshtv_simple_shader_prog(vertex_src_ellipse, fragment_src_ellipse);
 }
+
 // This part of Pishtov defines the main game loop.
 
 int main() {

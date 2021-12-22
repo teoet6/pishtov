@@ -27,16 +27,7 @@ void fill_color_hex(uint32_t hex) {
 }
 
 void draw() {
-    fill_color_hex(0x0000ff);
     fill_circle(my_x, my_y, 15);
-
-    fill_color_hex(0xff0000);
-    fill_line(my_x, my_y, mouse_x, mouse_y, 2);
-
-    if (is_button_pressed[1]) {
-        fill_color_hex(0x8000ffff);
-        fill_rect(start_x, start_y, mouse_x - start_x, mouse_y - start_y);
-    }
 }
 
 void keydown(int key) {
