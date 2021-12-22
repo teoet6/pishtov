@@ -890,7 +890,7 @@ void pshtv_init_opengl() {
     pglBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     const char *vertex_src_solid = R"XXX(
-        #version 330
+        #version 130
 
         in vec2 in_pos;
 
@@ -901,7 +901,7 @@ void pshtv_init_opengl() {
         }
     )XXX";
     const char *fragment_src_solid = R"XXX(
-        #version 330
+        #version 130
 
         uniform vec4 u_col;
 
@@ -913,7 +913,7 @@ void pshtv_init_opengl() {
 
     // TODO anti-aliasing
     const char *vertex_src_ellipse = R"XXX(
-        #version 330
+        #version 130
 
         in vec2 in_pos;
         in vec2 in_corner;
@@ -928,7 +928,7 @@ void pshtv_init_opengl() {
         }
     )XXX";
     const char *fragment_src_ellipse = R"XXX(
-        #version 330
+        #version 130
 
         in vec2 ex_corner;
 
