@@ -31,6 +31,7 @@ compiling his game breaks this workflow.
 An extra extra goal is compiling to WASM and Android.
 
 TODO In no particular order
+    [ ] Have a build system that expands `#include ""` and creates the final header file instead of writing everything in one file.
     [X] Make Pishtov a C library instead of a C++ one
     [X] Rectangles
     [X] Circles and Ellipses
@@ -923,8 +924,6 @@ void pshtv_redraw() {
 
     pglClearColor(1.0, 1.0, 1.0, 0.0);
     pglClear(GL_COLOR_BUFFER_BIT);
-
-
 
     float q = 2 / window_w;
     float p = 2 / window_h;

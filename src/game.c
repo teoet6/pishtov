@@ -1,15 +1,21 @@
 #include "pishtov.h"
 
+#define NUM_CIRCLES 100
+
 float my_x;
 float my_y;
 
-int is_button_pressed[10];
+float frame = 0;
 
-float start_x, start_y;
+float frand() {
+    return (float)rand() / (float)RAND_MAX;
+}
 
-void init() { }
+void init() {
+}
 
 void update() {
+    ++frame;
     my_x += (mouse_x - my_x) / 10;
     my_y += (mouse_y - my_y) / 10;
 }
@@ -27,7 +33,18 @@ void fill_color_hex(uint32_t hex) {
 }
 
 void draw() {
-    fill_circle(my_x, my_y, 15);
+    translate(my_x, my_y);
+    rotate(frame/50);
+    translate(-my_x, -my_y);
+
+    fill_rect(my_x, my_y, 30, 30);
+
+    translate(my_x, my_y);
+    rotate(-frame/50);
+    translate(-my_x, -my_y);
+
+    fill_color_hex(0xff0000);
+    fill_circle(window_w/2, window_h/2, 15);
 }
 
 void keydown(int key) {
@@ -36,14 +53,9 @@ void keydown(int key) {
 
 void keyup(int key) { }
 
-void mousedown(int button) {
-    is_button_pressed[button] = 1;
-    start_x = mouse_x;
-    start_y = mouse_y;
-}
+void mousedown(int button) { }
 
 void mouseup(int button) {
     printf("Mouse clicked at %.0f %.0f from %.0f %.0f\n", mouse_x, mouse_y, window_w, window_h);
-    is_button_pressed[button] = 0;
 }
 
