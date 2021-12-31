@@ -72,16 +72,14 @@ void init();
 void update();
 void draw();
 
-// This part of Pishtov deals with OS-specific stuff. This includes opening
-// a window, making an OpenGL context for said window, processing keyboard
-// and mouse input, swapping the buffers, providing functions that aren't
-// in the C standard library and more. You need to have the following
-// functions defined for each OS:
+// OS-specific stuff. This includes opening a window, making an OpenGL context
+// for said window, processing keyboard and mouse input, swapping the buffers,
+// providing functions that aren't in the C standard library and more. You need
+// to have the following functions defined for each OS:
 void pshtv_open_window(const char *name, int w, int h); // Open a window.
 void pshtv_handle_events(); // Ask the OS for new events and react accordingly.
 void pshtv_swap_buffers(); // Swap the OpenGL buffers. Can be a noop.
 void *pshtv_load_gl(const char *name); // Dynamically load an OpenGL function
-void pshtv_msleep(int mseconds); // Sleep for a number of milliseconds
 
 float mouse_x, mouse_y; // Automatically set to the mouse position on the window
 float window_w, window_h; // Automatically set to the window dimensions
@@ -245,11 +243,6 @@ void pshtv_handle_events() {
 
 void pshtv_swap_buffers() {
     pshtv_SwapBuffers(hdc);
-}
-
-void pshtv_msleep(int mseconds) {
-    // TODO
-    return;
 }
 
 #elif defined(__APPLE__)
@@ -627,14 +620,6 @@ void *pshtv_load_gl(const char *name) {
     if (!gl_handle)
         gl_handle = dlopen("libGL.so", RTLD_LAZY);
     return dlsym(gl_handle, name);
-}
-
-void pshtv_msleep(int mseconds) {
-    struct timespec req = {
-        .tv_sec  =  mseconds / 1000,
-        .tv_nsec = (mseconds % 1000) * 1000000,
-    };
-    nanosleep(&req, NULL);
 }
 
 #endif
@@ -1017,7 +1002,6 @@ int main() {
         pshtv_handle_events();
         update();
         pshtv_redraw();
-        pshtv_msleep(10);
     }
 }
 
