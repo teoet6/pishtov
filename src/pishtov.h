@@ -107,10 +107,9 @@ float window_w, window_h; // Automatically set to the window dimensions
 
 // The other part of the pishtov deals with actually drawing using OpenGL
 // It defines the following functions and variables:
-float transform_matrix[4][4];
+float pshtv_transform_matrix[4][4];
 float fill_color[4];
 
-void fill_poly(int count, const float* vertecies);
 void fill_ellipse(float x, float y, float rx, float ry);
 void fill_rect(float x, float y, float w, float h);
 void fill_circle(float x, float y, float r);
@@ -125,8 +124,8 @@ void pshtv_redraw();
 #include <windows.h>
 #include <windowsx.h>
 
-HWND hwnd;
-HDC hdc;
+HWND pshtv_hwnd;
+HDC pshtv_hdc;
 
 // These are all functions from wingdi so you have to link to them. In
 // order to retain our goal of compiling with default settings on
@@ -214,14 +213,14 @@ void pshtv_open_window(const char *name, int w, int h) {
     wc.hCursor = LoadCursor(hinstance, IDC_ARROW);
     RegisterClass(&wc);
 
-    hwnd = CreateWindowEx(0, name, name, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, w, h, NULL, NULL, hinstance, NULL);
-    if (hwnd == NULL) {
+    pshtv_hwnd = CreateWindowEx(0, name, name, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, w, h, NULL, NULL, hinstance, NULL);
+    if (pshtv_hwnd == NULL) {
         eprintf("Could not get window handle\n");
         exit(-1);
     }
 
-    hdc = GetDC(hwnd);
-    if (hdc == NULL) {
+    pshtv_hdc = GetDC(pshtv_hwnd);
+    if (pshtv_hdc == NULL) {
         eprintf("Could not get device context\n");
         exit(-1);
     }
@@ -236,24 +235,24 @@ void pshtv_open_window(const char *name, int w, int h) {
     pfd.cStencilBits = 8;
     pfd.iLayerType = PFD_MAIN_PLANE;
 
-    int pixel_format = pshtv_ChoosePixelFormat(hdc, &pfd);
+    int pixel_format = pshtv_ChoosePixelFormat(pshtv_hdc, &pfd);
     if (!pixel_format) {
         eprintf("Could not choose pixel format\n");
         exit(-1);
     }
 
-    pshtv_SetPixelFormat(hdc, pixel_format, &pfd);
+    pshtv_SetPixelFormat(pshtv_hdc, pixel_format, &pfd);
 
-    HGLRC context = pshtv_wglCreateContext(hdc);
-    pshtv_wglMakeCurrent(hdc, context);
+    HGLRC context = pshtv_wglCreateContext(pshtv_hdc);
+    pshtv_wglMakeCurrent(pshtv_hdc, context);
 
-    ShowWindow(hwnd, SW_NORMAL);
+    ShowWindow(pshtv_hwnd, SW_NORMAL);
 }
 
 void pshtv_handle_events() {
     MSG msg = {};
-    while(PeekMessage(&msg, hwnd, 0, 0, PM_NOREMOVE)) {
-        if(GetMessage(&msg, hwnd, 0, 0)) {
+    while(PeekMessage(&msg, pshtv_hwnd, 0, 0, PM_NOREMOVE)) {
+        if(GetMessage(&msg, pshtv_hwnd, 0, 0)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         } else {
@@ -263,7 +262,7 @@ void pshtv_handle_events() {
 }
 
 void pshtv_swap_buffers() {
-    pshtv_SwapBuffers(hdc);
+    pshtv_SwapBuffers(pshtv_hdc);
 }
 
 #elif defined(__APPLE__)
@@ -281,24 +280,24 @@ void pshtv_swap_buffers() {
 #include <dlfcn.h>
 #include <time.h>
 
-Display *display;
-Window window;
-Atom atom_wm_delete_window;
+Display *pshtv_display;
+Window pshtv_window;
+Atom pshtv_atom_wm_delete_window;
 
 void pshtv_open_window(const char *name, int w, int h) {
     int screen_id;
     GLXContext context;
 
-    display = XOpenDisplay(NULL);
-    if (display == NULL) {
+    pshtv_display = XOpenDisplay(NULL);
+    if (pshtv_display == NULL) {
         eprintf("Error opening X11 display\n")
             exit(-1);
     }
 
-    screen_id = DefaultScreen(display);
+    screen_id = DefaultScreen(pshtv_display);
 
     GLint majorGLX = 0, minorGLX = 0;
-    glXQueryVersion(display, &majorGLX, &minorGLX);
+    glXQueryVersion(pshtv_display, &majorGLX, &minorGLX);
     if (majorGLX < 1 && minorGLX < 2) {
         eprintf("glx version is %d.%d\n", majorGLX, minorGLX);
         eprintf("Minimum supported glx version is 1.2\n");
@@ -317,30 +316,30 @@ void pshtv_open_window(const char *name, int w, int h) {
         // GLX_SAMPLES, 0,
         None,
     };
-    XVisualInfo *visual_info = glXChooseVisual(display, screen_id, glx_attribs);
+    XVisualInfo *visual_info = glXChooseVisual(pshtv_display, screen_id, glx_attribs);
     if (visual_info == NULL) {
         eprintf("Could not create correct visual window\n");
         exit(-1);
     }
 
     XSetWindowAttributes attributes;
-    attributes.border_pixel = BlackPixel(display, screen_id);
-    attributes.background_pixel = WhitePixel(display, screen_id);
+    attributes.border_pixel = BlackPixel(pshtv_display, screen_id);
+    attributes.background_pixel = WhitePixel(pshtv_display, screen_id);
     attributes.override_redirect = True;
-    attributes.colormap = XCreateColormap(display, RootWindow(display, screen_id), visual_info->visual, AllocNone);
+    attributes.colormap = XCreateColormap(pshtv_display, RootWindow(pshtv_display, screen_id), visual_info->visual, AllocNone);
     attributes.event_mask = ExposureMask;
 
-    window = XCreateWindow(display, RootWindow(display, screen_id), 0, 0, w, h, 0, visual_info->depth, InputOutput, visual_info->visual, CWBackPixel | CWColormap | CWBorderPixel | CWEventMask, &attributes);
+    pshtv_window = XCreateWindow(pshtv_display, RootWindow(pshtv_display, screen_id), 0, 0, w, h, 0, visual_info->depth, InputOutput, visual_info->visual, CWBackPixel | CWColormap | CWBorderPixel | CWEventMask, &attributes);
 
-    atom_wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
-    XSetWMProtocols(display, window, &atom_wm_delete_window, 1);
+    pshtv_atom_wm_delete_window = XInternAtom(pshtv_display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(pshtv_display, pshtv_window, &pshtv_atom_wm_delete_window, 1);
 
-    context = glXCreateContext(display, visual_info, NULL, GL_TRUE);
-    glXMakeCurrent(display, window, context);
+    context = glXCreateContext(pshtv_display, visual_info, NULL, GL_TRUE);
+    glXMakeCurrent(pshtv_display, pshtv_window, context);
 
-    XClearWindow(display, window);
+    XClearWindow(pshtv_display, pshtv_window);
 
-    XSelectInput(display, window,
+    XSelectInput(pshtv_display, pshtv_window,
                  PointerMotionMask |
                  ButtonPressMask |
                  ButtonReleaseMask |
@@ -349,9 +348,9 @@ void pshtv_open_window(const char *name, int w, int h) {
                  KeymapStateMask |
                  StructureNotifyMask);
 
-    XStoreName(display, window, name);
+    XStoreName(pshtv_display, pshtv_window, name);
 
-    XMapWindow(display, window);
+    XMapWindow(pshtv_display, pshtv_window);
 }
 
 // TODO use KF86 keys as well
@@ -594,9 +593,9 @@ int pshtv_translate_key(int native) {
 }
 
 void pshtv_handle_events() {
-    while (XPending(display)) {
+    while (XPending(pshtv_display)) {
         XEvent ev;
-        XNextEvent(display, &ev);
+        XNextEvent(pshtv_display, &ev);
         switch (ev.type) {
         case MotionNotify:
             mouse_x = ev.xmotion.x;
@@ -622,7 +621,7 @@ void pshtv_handle_events() {
             window_h = ev.xconfigure.height;
             break;
         case ClientMessage:
-            if (ev.xclient.data.l[0] == atom_wm_delete_window)
+            if (ev.xclient.data.l[0] == pshtv_atom_wm_delete_window)
                 exit(0);
             break;
         case DestroyNotify:
@@ -633,7 +632,7 @@ void pshtv_handle_events() {
 }
 
 void pshtv_swap_buffers() {
-    glXSwapBuffers(display, window);
+    glXSwapBuffers(pshtv_display, pshtv_window);
 }
 
 void *pshtv_load_gl(const char *name) {
@@ -769,11 +768,19 @@ unsigned int pshtv_simple_shader_prog(const char *vertex_src, const char *fragme
     return prog;
 }
 
-void fill_poly(int count, const float *vertecies) {
+
+// TODO the naming here is kinda messy and confusing
+#define PSHTV_MAX_QUADS 4096
+#define PSHTV_VERTEX_LEN (2 + 4)
+#define PSHTV_QUAD_LEN (4 * PSHTV_VERTEX_LEN)
+size_t pshtv_quads_len;
+float pshtv_quads[PSHTV_MAX_QUADS * PSHTV_QUAD_LEN];
+
+void pshtv_flush_quads() {
     pglUseProgram(pshtv_prog_solid);
 
     GLuint vao, vbo;
-    GLint in_pos, u_col, u_transform;
+    GLint in_pos, in_col, u_transform;
 
     pglGenVertexArrays(1, &vao);
     pglBindVertexArray(vao);
@@ -781,23 +788,26 @@ void fill_poly(int count, const float *vertecies) {
     pglGenBuffers(1, &vbo);
 
     pglBindBuffer(GL_ARRAY_BUFFER, vbo);
-    pglBufferData(GL_ARRAY_BUFFER, count * 2 * sizeof(float), vertecies, GL_STREAM_DRAW);
+    pglBufferData(GL_ARRAY_BUFFER, pshtv_quads_len * PSHTV_QUAD_LEN * sizeof(float), pshtv_quads, GL_STREAM_DRAW);
+
     in_pos = pglGetAttribLocation(pshtv_prog_solid, "in_pos");
-    pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, PSHTV_VERTEX_LEN * sizeof(float), 0);
     pglEnableVertexAttribArray(in_pos);
 
-    u_col = pglGetUniformLocation(pshtv_prog_solid, "u_col");
-    pglUniform4fv(u_col, 1, (const float*)fill_color);
-    pglEnableVertexAttribArray(u_col);
+    in_col = pglGetAttribLocation(pshtv_prog_solid, "in_col");
+    pglVertexAttribPointer(in_col, 4, GL_FLOAT, GL_FALSE, PSHTV_VERTEX_LEN * sizeof(float), (void*)(2 * sizeof(float)));
+    pglEnableVertexAttribArray(in_col);
 
     u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
-    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)transform_matrix);
+    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
-    pglDrawArrays(GL_TRIANGLE_FAN, 0, count);
+    pglDrawArrays(GL_QUADS, 0, 4 * pshtv_quads_len);
 
     pglDeleteBuffers(1, &vbo);
     pglDeleteVertexArrays(1, &vao);
+
+    pshtv_quads_len = 0;
 }
 
 void fill_ellipse(float x, float y, float rx, float ry) {
@@ -842,7 +852,7 @@ void fill_ellipse(float x, float y, float rx, float ry) {
     pglEnableVertexAttribArray(u_col);
 
     u_transform = pglGetUniformLocation(pshtv_prog_ellipse, "u_transform");
-    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)transform_matrix);
+    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
     pglDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -852,14 +862,16 @@ void fill_ellipse(float x, float y, float rx, float ry) {
 }
 
 void fill_rect(float x, float y, float w, float h) {
-    const float vertecies[4][2] = {
-        { x    , y     },
-        { x + w, y     },
-        { x + w, y + h },
-        { x    , y + h },
+    const float vertecies[PSHTV_QUAD_LEN] = {
+        x,     y,     fill_color[0], fill_color[1], fill_color[2], fill_color[3],
+        x + w, y,     fill_color[0], fill_color[1], fill_color[2], fill_color[3],
+        x + w, y + h, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
+        x,     y + h, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
     };
 
-    fill_poly(4, (const float*)vertecies);
+    memcpy(pshtv_quads + pshtv_quads_len * PSHTV_QUAD_LEN, vertecies, PSHTV_QUAD_LEN * sizeof(float));
+
+    if (++pshtv_quads_len == PSHTV_MAX_QUADS) pshtv_flush_quads();
 }
 
 void fill_circle(float x, float y, float r) {
@@ -874,23 +886,27 @@ void fill_line(float x1, float y1, float x2, float y2, float w) {
     const float x3 = w * .5 * -y0 / len;
     const float y3 = w * .5 *  x0 / len;
 
-    const float vertecies[4][2] = {
-        { x1 - x3, y1 - y3 },
-        { x1 + x3, y1 + y3 },
-        { x2 + x3, y2 + y3 },
-        { x2 - x3, y2 - y3 },
+    const float vertecies[PSHTV_QUAD_LEN] = {
+        x1 - x3, y1 - y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
+        x1 + x3, y1 + y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
+        x2 + x3, y2 + y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
+        x2 - x3, y2 - y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
     };
 
-    fill_poly(4, (const float*)vertecies);
+    memcpy(pshtv_quads + pshtv_quads_len * PSHTV_QUAD_LEN, vertecies, PSHTV_QUAD_LEN * sizeof(float));
+
+    if (++pshtv_quads_len == PSHTV_MAX_QUADS) pshtv_flush_quads();
 }
 
-void pshtv_mul_matrix4(float a[4][4], float b[4][4]) {
-    float c[4][4] = {};
+void pshtv_mul_transform_matrix_by(float by[4][4]) {
+    pshtv_flush_quads();
+
+    float new[4][4] = {};
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
             for (int g = 0; g < 4; ++g)
-                c[i][j] += a[i][g] * b[g][j];
-    memcpy(a, c, sizeof(float) * 4 * 4);
+                new[i][j] += pshtv_transform_matrix[i][g] * by[g][j];
+    memcpy(pshtv_transform_matrix, new, sizeof(float) * 4 * 4);
 }
 
 void translate(float x, float y) {
@@ -900,7 +916,7 @@ void translate(float x, float y) {
         { 0, 0, 1, 0 },
         { 0, 0, 0, 1 },
     };
-    pshtv_mul_matrix4(transform_matrix, translate_matrix);
+    pshtv_mul_transform_matrix_by(translate_matrix);
 }
 
 void scale(float x, float y) {
@@ -910,7 +926,7 @@ void scale(float x, float y) {
         { 0, 0, 1, 0 },
         { 0, 0, 0, 1 },
     };
-    pshtv_mul_matrix4(transform_matrix, scale_matrix);
+    pshtv_mul_transform_matrix_by(scale_matrix);
 }
 
 void rotate(float a) {
@@ -922,7 +938,7 @@ void rotate(float a) {
         { 0,  0, 1, 0 },
         { 0,  0, 0, 1 },
     };
-    pshtv_mul_matrix4(transform_matrix, rotate_matrix);
+    pshtv_mul_transform_matrix_by(rotate_matrix);
 }
 
 void pshtv_redraw() {
@@ -936,7 +952,7 @@ void pshtv_redraw() {
 
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
-            transform_matrix[i][j] = i == j ? 1 : 0;
+            pshtv_transform_matrix[i][j] = i == j ? 1 : 0;
 
     translate(-1, 1);
     scale(2 / window_w, -2 / window_h);
@@ -944,6 +960,7 @@ void pshtv_redraw() {
     fill_color[0] = 0; fill_color[1] = 0; fill_color[2] = 1; fill_color[3] = 1;
 
     draw();
+    pshtv_flush_quads();
     pglFlush();
     pshtv_swap_buffers();
 }
@@ -958,20 +975,24 @@ void pshtv_init_opengl() {
         #version 130
 
         in vec2 in_pos;
+        in vec4 in_col;
+
+        out vec4 ex_col;
 
         uniform mat4 u_transform;
 
         void main() {
             gl_Position = u_transform * vec4(in_pos, 0.0, 1.0);
+            ex_col = in_col;
         }
     )XXX";
     const char *fragment_src_solid = R"XXX(
         #version 130
 
-        uniform vec4 u_col;
+        in vec4 ex_col;
 
         void main() {
-            gl_FragColor = u_col;
+            gl_FragColor = ex_col;
         }
     )XXX";
     pshtv_prog_solid = pshtv_simple_shader_prog(vertex_src_solid, fragment_src_solid);
