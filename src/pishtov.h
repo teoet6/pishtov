@@ -70,8 +70,8 @@ TODO In no particular order
     [ ] Android compile
 */
 
-#ifndef __PISHTOV_H
-#define __PISHTOV_H
+#ifndef PISHTOV_H
+#define PISHTOV_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -110,9 +110,9 @@ float window_w, window_h; // Automatically set to the window dimensions
 float pshtv_transform_matrix[4][4];
 float fill_color[4];
 
+void fill_circle(float x, float y, float r);
 void fill_ellipse(float x, float y, float rx, float ry);
 void fill_rect(float x, float y, float w, float h);
-void fill_circle(float x, float y, float r);
 void fill_line(float x1, float y1, float x2, float y2, float w);
 void translate(float x, float y);
 void scale(float x, float y);
@@ -1051,4 +1051,4 @@ int main() {
 }
 #endif
 
-#endif // __PISHTOV_H
+#endif // PISHTOV_H
