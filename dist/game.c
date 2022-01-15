@@ -13,6 +13,17 @@ uint64_t get_timestamp() {
     return ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
 
+float frand() {
+    return (float)rand() / RAND_MAX;
+}
+
+void fill_color_hex(uint32_t c) {
+    fill_color[0] =     (c >> 16 & 0xff) / 255.f;
+    fill_color[1] =     (c >>  8 & 0xff) / 255.f;
+    fill_color[2] =     (c       & 0xff) / 255.f;
+    fill_color[3] = 1 - (c >> 24 & 0xff) / 255.f;
+}
+
 void update() {
     my_x += (mouse_x - my_x) / 10;
     my_y += (mouse_y - my_y) / 10;
@@ -30,14 +41,8 @@ void draw() {
         }
     }
 
-
-    fill_color[0] = 0.f;
-    fill_color[1] = 0.f;
-    fill_color[2] = 0.f;
-
-    fill_rect(my_x, my_y, 30, 30);
-    translate(100, 100);
-    fill_rect(my_x, my_y, 30, 30);
+    fill_color_hex(0xffffff);
+    fill_ellipse(my_x, my_y, 15, 15);
 
     uint64_t end_draw = get_timestamp();
     printf("draw() took %.0fms\n", (end_draw - begin_draw) / 1000000.f);

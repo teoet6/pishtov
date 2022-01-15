@@ -80,6 +80,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <math.h>
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
@@ -653,6 +654,8 @@ typedef void (*PFNGLCLEARCOLORPROC) (GLclampf red, GLclampf green, GLclampf blue
 typedef void (*PFNGLCLEARPROC) (GLbitfield mask);
 typedef void (*PFNGLENABLEPROC) (GLenum cap);
 typedef void (*PFNGLBLENDFUNCPROC) (GLenum sfactor, GLenum dfactor);
+typedef void (*PFNGLDEPTHFUNCPROC) (GLenum func);
+typedef void (*PFNGLCLEARDEPTHPROC) (GLdouble depth);
 
 PFNGLENABLEPROC                  pglEnable;
 PFNGLFLUSHPROC                   pglFlush;
@@ -686,6 +689,8 @@ PFNGLGETUNIFORMLOCATIONPROC      pglGetUniformLocation;
 PFNGLUNIFORMMATRIX4FVPROC        pglUniformMatrix4fv;
 PFNGLUNIFORM4FVPROC              pglUniform4fv;
 PFNGLBLENDFUNCPROC               pglBlendFunc;
+PFNGLDEPTHFUNCPROC               pglDepthFunc;
+PFNGLCLEARDEPTHPROC              pglClearDepth;
 
 #define LOAD_GL(T, X) p ## X = (T)pshtv_load_gl(#X)
 void pshtv_load_gls() {
@@ -721,14 +726,16 @@ void pshtv_load_gls() {
     LOAD_GL(PFNGLGETUNIFORMLOCATIONPROC,      glGetUniformLocation);
     LOAD_GL(PFNGLUNIFORM4FVPROC,              glUniform4fv);
     LOAD_GL(PFNGLBLENDFUNCPROC,               glBlendFunc);
+    LOAD_GL(PFNGLDEPTHFUNCPROC,               glDepthFunc);
+    LOAD_GL(PFNGLCLEARDEPTHPROC,              glClearDepth);
 }
 #undef LOAD_GL
 
-unsigned int pshtv_prog_solid;
-unsigned int pshtv_prog_ellipse;
+uint32_t pshtv_prog_solid;
+uint32_t pshtv_prog_ellipse;
 
-unsigned int pshtv_compile_shader(const char *src, GLenum type) {
-    unsigned int shader = pglCreateShader(type);
+uint32_t pshtv_compile_shader(const char *src, GLenum type) {
+    uint32_t shader = pglCreateShader(type);
 
     pglShaderSource(shader, 1, &src, NULL);
     pglCompileShader(shader);
@@ -744,11 +751,11 @@ unsigned int pshtv_compile_shader(const char *src, GLenum type) {
     return shader;
 }
 
-unsigned int pshtv_simple_shader_prog(const char *vertex_src, const char *fragment_src) {
-    unsigned int prog = pglCreateProgram();
+uint32_t pshtv_simple_shader_prog(const char *vertex_src, const char *fragment_src) {
+    uint32_t prog = pglCreateProgram();
 
-    unsigned int vertex_shader = pshtv_compile_shader(vertex_src, GL_VERTEX_SHADER);
-    unsigned int fragment_shader = pshtv_compile_shader(fragment_src, GL_FRAGMENT_SHADER);
+    uint32_t vertex_shader = pshtv_compile_shader(vertex_src, GL_VERTEX_SHADER);
+    uint32_t fragment_shader = pshtv_compile_shader(fragment_src, GL_FRAGMENT_SHADER);
 
     pglAttachShader(prog, vertex_shader);
     pglAttachShader(prog, fragment_shader);
@@ -768,114 +775,120 @@ unsigned int pshtv_simple_shader_prog(const char *vertex_src, const char *fragme
     return prog;
 }
 
+float pshtv_z;
 
-// TODO the naming here is kinda messy and confusing
-#define PSHTV_MAX_QUADS 4096
-#define PSHTV_VERTEX_LEN (2 + 4)
-#define PSHTV_QUAD_LEN (4 * PSHTV_VERTEX_LEN)
-size_t pshtv_quads_len;
-float pshtv_quads[PSHTV_MAX_QUADS * PSHTV_QUAD_LEN];
+#define PSHTV_PASS_FIELD_AS_ATTRIBUTE(SHADER, ATTRIBUTE, SIZE, TYPE, NORMALIZED, STRUCT, FIELD) { \
+    GLint attribute_index = pglGetAttribLocation(SHADER, ATTRIBUTE); \
+    pglVertexAttribPointer(attribute_index, SIZE, TYPE, NORMALIZED, sizeof(STRUCT), (void*)offsetof(STRUCT, FIELD)); \
+    pglEnableVertexAttribArray(attribute_index); \
+}
+
+struct Pshtv_Quad_Vert {
+    float pos[2];
+    float col[4];
+    float z;
+};
+
+#define PSHTV_QUAD_VERTS_CAP 4096 * 4
+size_t pshtv_quad_verts_len;
+struct Pshtv_Quad_Vert pshtv_quad_verts[PSHTV_QUAD_VERTS_CAP];
 
 void pshtv_flush_quads() {
+    if (!pshtv_quad_verts_len) return;
+
     pglUseProgram(pshtv_prog_solid);
 
     GLuint vao, vbo;
-    GLint in_pos, in_col, u_transform;
 
     pglGenVertexArrays(1, &vao);
     pglBindVertexArray(vao);
 
     pglGenBuffers(1, &vbo);
-
     pglBindBuffer(GL_ARRAY_BUFFER, vbo);
-    pglBufferData(GL_ARRAY_BUFFER, pshtv_quads_len * PSHTV_QUAD_LEN * sizeof(float), pshtv_quads, GL_STREAM_DRAW);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Quad_Vert) * pshtv_quad_verts_len, pshtv_quad_verts, GL_STREAM_DRAW);
 
-    in_pos = pglGetAttribLocation(pshtv_prog_solid, "in_pos");
-    pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, PSHTV_VERTEX_LEN * sizeof(float), 0);
-    pglEnableVertexAttribArray(in_pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_solid, "in_pos", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_solid, "in_col", 4, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_solid, "in_z",   1, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, z);
 
-    in_col = pglGetAttribLocation(pshtv_prog_solid, "in_col");
-    pglVertexAttribPointer(in_col, 4, GL_FLOAT, GL_FALSE, PSHTV_VERTEX_LEN * sizeof(float), (void*)(2 * sizeof(float)));
-    pglEnableVertexAttribArray(in_col);
-
-    u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
+    GLint u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
-    pglDrawArrays(GL_QUADS, 0, 4 * pshtv_quads_len);
+    pglDrawArrays(GL_QUADS, 0, pshtv_quad_verts_len);
 
     pglDeleteBuffers(1, &vbo);
     pglDeleteVertexArrays(1, &vao);
 
-    pshtv_quads_len = 0;
+    pshtv_quad_verts_len = 0;
 }
 
-void fill_ellipse(float x, float y, float rx, float ry) {
+struct Pshtv_Ellipse_Vert {
+    float pos[2];
+    float col[4];
+    float corner[2];
+    float z;
+};
+
+#define PSHTV_ELLIPSE_VERTS_CAP 4096 * 4
+size_t pshtv_ellipse_verts_len;
+struct Pshtv_Ellipse_Vert pshtv_ellipse_verts[PSHTV_ELLIPSE_VERTS_CAP];
+
+void pshtv_flush_ellipses() {
+    if (!pshtv_ellipse_verts_len) return;
+
     pglUseProgram(pshtv_prog_ellipse);
 
-    GLuint vao, vbo[2];
-    GLint in_pos, in_corner, u_col, u_transform;
-
-    const GLfloat vertecies[4][2] = {
-        { x - rx, y - ry },
-        { x + rx, y - ry },
-        { x + rx, y + ry },
-        { x - rx, y + ry },
-    };
-
-    const GLfloat corners[4][2] = {
-        { -1, -1 },
-        { +1, -1 },
-        { +1, +1 },
-        { -1, +1 },
-    };
+    GLuint vao, vbo;
 
     pglGenVertexArrays(1, &vao);
     pglBindVertexArray(vao);
 
-    pglGenBuffers(2, vbo);
+    pglGenBuffers(1, &vbo);
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Ellipse_Vert) * pshtv_ellipse_verts_len, pshtv_ellipse_verts, GL_STREAM_DRAW);
 
-    pglBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    pglBufferData(GL_ARRAY_BUFFER, sizeof(vertecies), vertecies, GL_STREAM_DRAW);
-    in_pos = pglGetAttribLocation(pshtv_prog_ellipse, "in_pos");
-    pglVertexAttribPointer(in_pos, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    pglEnableVertexAttribArray(in_pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_pos",    2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_col",    4, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_corner", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, corner);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_z",      1, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, z);
 
-    pglBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    pglBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STREAM_DRAW);
-    in_corner = pglGetAttribLocation(pshtv_prog_ellipse, "in_corner");
-    pglVertexAttribPointer(in_corner, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    pglEnableVertexAttribArray(in_corner);
-
-    u_col = pglGetUniformLocation(pshtv_prog_ellipse, "u_col");
-    pglUniform4fv(u_col, 1, (const float*)fill_color);
-    pglEnableVertexAttribArray(u_col);
-
-    u_transform = pglGetUniformLocation(pshtv_prog_ellipse, "u_transform");
+    GLint u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
-    pglDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    pglDrawArrays(GL_QUADS, 0, pshtv_ellipse_verts_len);
 
-    pglDeleteBuffers(2, vbo);
+    pglDeleteBuffers(1, &vbo);
     pglDeleteVertexArrays(1, &vao);
+
+    pshtv_ellipse_verts_len = 0;
+}
+
+void pshtv_flush_all() {
+    pshtv_flush_quads();
+    pshtv_flush_ellipses();
+}
+
+void fill_ellipse(float x, float y, float rx, float ry) {
+
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, -1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, +1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, +1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, -1 }, .z = pshtv_z };
+    ++pshtv_z;
+
+    if (pshtv_ellipse_verts_len == PSHTV_ELLIPSE_VERTS_CAP) pshtv_flush_ellipses();
 }
 
 void fill_rect(float x, float y, float w, float h) {
-    const float vertecies[PSHTV_QUAD_LEN] = {
-        x,     y,     fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-        x + w, y,     fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-        x + w, y + h, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-        x,     y + h, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-    };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y,    }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y,    }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y + h }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y + h }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    ++pshtv_z;
 
-    memcpy(pshtv_quads + pshtv_quads_len * PSHTV_QUAD_LEN, vertecies, PSHTV_QUAD_LEN * sizeof(float));
-
-    if (++pshtv_quads_len == PSHTV_MAX_QUADS) pshtv_flush_quads();
-}
-
-void fill_circle(float x, float y, float r) {
-    fill_ellipse(x, y, r, r);
+    if (pshtv_quad_verts_len == PSHTV_QUAD_VERTS_CAP) pshtv_flush_quads();
 }
 
 // TODO Make this into a shader
@@ -886,20 +899,17 @@ void fill_line(float x1, float y1, float x2, float y2, float w) {
     const float x3 = w * .5 * -y0 / len;
     const float y3 = w * .5 *  x0 / len;
 
-    const float vertecies[PSHTV_QUAD_LEN] = {
-        x1 - x3, y1 - y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-        x1 + x3, y1 + y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-        x2 + x3, y2 + y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-        x2 - x3, y2 - y3, fill_color[0], fill_color[1], fill_color[2], fill_color[3],
-    };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x1 - x3, y1 - y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x1 + x3, y1 + y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x2 + x3, y2 + y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x2 - x3, y2 - y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    ++pshtv_z;
 
-    memcpy(pshtv_quads + pshtv_quads_len * PSHTV_QUAD_LEN, vertecies, PSHTV_QUAD_LEN * sizeof(float));
-
-    if (++pshtv_quads_len == PSHTV_MAX_QUADS) pshtv_flush_quads();
+    if (pshtv_quad_verts_len == PSHTV_QUAD_VERTS_CAP) pshtv_flush_quads();
 }
 
 void pshtv_mul_transform_matrix_by(float by[4][4]) {
-    pshtv_flush_quads();
+    pshtv_flush_all();
 
     float new[4][4] = {};
     for (int i = 0; i < 4; ++i)
@@ -944,8 +954,9 @@ void rotate(float a) {
 void pshtv_redraw() {
     pglViewport(0, 0, window_w, window_h);
 
-    pglClearColor(1.0, 1.0, 1.0, 0.0);
-    pglClear(GL_COLOR_BUFFER_BIT);
+    pglClearColor(1.0, 1.0, 1.0, 1.0);
+    pglClearDepth(0.0);
+    pglClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     float q = 2 / window_w;
     float p = 2 / window_h;
@@ -959,8 +970,10 @@ void pshtv_redraw() {
 
     fill_color[0] = 0; fill_color[1] = 0; fill_color[2] = 1; fill_color[3] = 1;
 
+    pshtv_z = 0;
+
     draw();
-    pshtv_flush_quads();
+    pshtv_flush_all();
     pglFlush();
     pshtv_swap_buffers();
 }
@@ -971,18 +984,22 @@ void pshtv_init_opengl() {
     pglEnable(GL_BLEND);
     pglBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    pglEnable(GL_DEPTH_TEST);
+    pglDepthFunc(GL_GEQUAL);
+
     const char *vertex_src_solid = R"XXX(
         #version 130
 
         in vec2 in_pos;
         in vec4 in_col;
+        in float in_z;
 
         out vec4 ex_col;
 
         uniform mat4 u_transform;
 
         void main() {
-            gl_Position = u_transform * vec4(in_pos, 0.0, 1.0);
+            gl_Position = u_transform * vec4(in_pos, in_z / 10000000.f, 1.0);
             ex_col = in_col;
         }
     )XXX";
@@ -1003,31 +1020,30 @@ void pshtv_init_opengl() {
 
         in vec2 in_pos;
         in vec2 in_corner;
+        in vec4 in_col;
+        in float in_z;
 
         out vec2 ex_corner;
+        out vec4 ex_col;
 
         uniform mat4 u_transform;
 
         void main() {
-            gl_Position = u_transform * vec4(in_pos, 0.0, 1.0);
+            gl_Position = u_transform * vec4(in_pos, in_z / 10000000.f, 1.0);
             ex_corner = in_corner;
+            ex_col = in_col;
         }
     )XXX";
     const char *fragment_src_ellipse = R"XXX(
         #version 130
 
         in vec2 ex_corner;
-
-        uniform vec4 u_col;
+        in vec4 ex_col;
 
         void main() {
-            if (ex_corner.x == 0) {
-                gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
-                return;
-            }
             if (dot(ex_corner, ex_corner) > 1.0)
                 discard;
-            gl_FragColor = u_col;
+            gl_FragColor = ex_col;
         }
     )XXX";
     pshtv_prog_ellipse = pshtv_simple_shader_prog(vertex_src_ellipse, fragment_src_ellipse);
