@@ -111,14 +111,18 @@ float window_w, window_h; // Automatically set to the window dimensions
 float pshtv_transform_matrix[4][4];
 float fill_color[4];
 
-void fill_circle(float x, float y, float r);
 void fill_ellipse(float x, float y, float rx, float ry);
 void fill_rect(float x, float y, float w, float h);
 void fill_line(float x1, float y1, float x2, float y2, float w);
+void draw_image(void *data, int data_w, int data_h, float x, float y, float w, float h);
 void translate(float x, float y);
 void scale(float x, float y);
 void rotate(float a);
 void pshtv_redraw();
+
+// All of the functions not mentioned above are implementation details and are
+// subject to change and/or removal at any time. Functions mentioned above are
+// more or less stable.
 
 #if defined(_WIN32) // Windows 32 or 64 bit
 
@@ -648,88 +652,111 @@ void *pshtv_load_gl(const char *name) {
 #include <GL/gl.h>
 #include <GL/glext.h>
 
-typedef void (*PFNGLFLUSHPROC) (void);
-typedef void (*PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
-typedef void (*PFNGLCLEARCOLORPROC) (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha);
-typedef void (*PFNGLCLEARPROC) (GLbitfield mask);
-typedef void (*PFNGLENABLEPROC) (GLenum cap);
-typedef void (*PFNGLBLENDFUNCPROC) (GLenum sfactor, GLenum dfactor);
-typedef void (*PFNGLDEPTHFUNCPROC) (GLenum func);
-typedef void (*PFNGLCLEARDEPTHPROC) (GLdouble depth);
+typedef void (*glAttachShader_t) (GLuint program, GLuint shader);
+typedef void (*glBindBuffer_t) (GLenum target, GLuint buffer);
+typedef void (*glBindVertexArray_t) (GLuint array);
+typedef void (*glBlendFunc_t) (GLenum sfactor, GLenum dfactor);
+typedef void (*glBufferData_t) (GLenum target, GLsizeiptr size, const void * data, GLenum usage);
+typedef void (*glClear_t) (GLbitfield mask);
+typedef void (*glClearColor_t) (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
+typedef void (*glClearDepth_t) (GLdouble depth);
+typedef void (*glCompileShader_t) (GLuint shader);
+typedef GLuint (*glCreateProgram_t) (void);
+typedef GLuint (*glCreateShader_t) (GLenum shaderType);
+typedef void (*glDeleteBuffers_t) (GLsizei n, const GLuint * buffers);
+typedef void (*glDeleteShader_t) (GLuint shader);
+typedef void (*glDeleteVertexArrays_t) (GLsizei n, const GLuint *arrays);
+typedef void (*glDepthFunc_t) (GLenum func);
+typedef void (*glDrawArrays_t) (GLenum mode, GLint first, GLsizei count);
+typedef void (*glEnable_t) (GLenum cap);
+typedef void (*glEnableVertexAttribArray_t) (GLuint index);
+typedef void (*glFlush_t) (void);
+typedef void (*glGenBuffers_t) (GLsizei n, GLuint * buffers);
+typedef void (*glGenVertexArrays_t) (GLsizei n, GLuint *arrays);
+typedef GLint (*glGetAttribLocation_t) (GLuint program, const GLchar *name);
+typedef void (*glGetProgramInfoLog_t) (GLuint program, GLsizei maxLength, GLsizei *length, GLchar *infoLog);
+typedef void (*glGetProgramiv_t) (GLuint program, GLenum pname, GLint *params);
+typedef void (*glGetShaderInfoLog_t) (GLuint shader, GLsizei maxLength, GLsizei *length, GLchar *infoLog);
+typedef void (*glGetShaderiv_t) (GLuint shader, GLenum pname, GLint *params);
+typedef GLint (*glGetUniformLocation_t) (GLuint program, const GLchar *name);
+typedef void (*glLinkProgram_t) (GLuint program);
+typedef void (*glShaderSource_t) (GLuint shader, GLsizei count, const GLchar **string, const GLint *length);
+typedef void (*glUniformMatrix4fv_t) (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+typedef void (*glUseProgram_t) (GLuint program);
+typedef void (*glVertexAttribPointer_t) (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer);
+typedef void (*glViewport_t) (GLint x, GLint y, GLsizei width, GLsizei height);
 
-PFNGLENABLEPROC                  pglEnable;
-PFNGLFLUSHPROC                   pglFlush;
-PFNGLVIEWPORTPROC                pglViewport;
-PFNGLDRAWARRAYSEXTPROC           pglDrawArrays;
-PFNGLCLEARCOLORPROC              pglClearColor;
-PFNGLCLEARPROC                   pglClear;
-PFNGLCREATESHADERPROC            pglCreateShader;
-PFNGLSHADERSOURCEPROC            pglShaderSource;
-PFNGLCOMPILESHADERPROC           pglCompileShader;
-PFNGLGETSHADERIVPROC             pglGetShaderiv;
-PFNGLGETSHADERINFOLOGPROC        pglGetShaderInfoLog;
-PFNGLCREATEPROGRAMPROC           pglCreateProgram;
-PFNGLATTACHSHADERPROC            pglAttachShader;
-PFNGLLINKPROGRAMPROC             pglLinkProgram;
-PFNGLGETPROGRAMIVPROC            pglGetProgramiv;
-PFNGLGETPROGRAMINFOLOGPROC       pglGetProgramInfoLog;
-PFNGLDELETESHADERPROC            pglDeleteShader;
-PFNGLUSEPROGRAMPROC              pglUseProgram;
-PFNGLGENVERTEXARRAYSPROC         pglGenVertexArrays;
-PFNGLDELETEVERTEXARRAYSPROC      pglDeleteVertexArrays;
-PFNGLBINDVERTEXARRAYPROC         pglBindVertexArray;
-PFNGLGENBUFFERSPROC              pglGenBuffers;
-PFNGLDELETEBUFFERSPROC           pglDeleteBuffers;
-PFNGLBINDBUFFERPROC              pglBindBuffer;
-PFNGLBUFFERDATAPROC              pglBufferData;
-PFNGLVERTEXATTRIBPOINTERPROC     pglVertexAttribPointer;
-PFNGLENABLEVERTEXATTRIBARRAYPROC pglEnableVertexAttribArray;
-PFNGLGETATTRIBLOCATIONPROC       pglGetAttribLocation;
-PFNGLGETUNIFORMLOCATIONPROC      pglGetUniformLocation;
-PFNGLUNIFORMMATRIX4FVPROC        pglUniformMatrix4fv;
-PFNGLUNIFORM4FVPROC              pglUniform4fv;
-PFNGLBLENDFUNCPROC               pglBlendFunc;
-PFNGLDEPTHFUNCPROC               pglDepthFunc;
-PFNGLCLEARDEPTHPROC              pglClearDepth;
+#define PSHTV_DECLARE_GL(X) X ## _t p ## X
+PSHTV_DECLARE_GL(glAttachShader);
+PSHTV_DECLARE_GL(glBindBuffer);
+PSHTV_DECLARE_GL(glBindVertexArray);
+PSHTV_DECLARE_GL(glBlendFunc);
+PSHTV_DECLARE_GL(glBufferData);
+PSHTV_DECLARE_GL(glClear);
+PSHTV_DECLARE_GL(glClearColor);
+PSHTV_DECLARE_GL(glClearDepth);
+PSHTV_DECLARE_GL(glCompileShader);
+PSHTV_DECLARE_GL(glCreateProgram);
+PSHTV_DECLARE_GL(glCreateShader);
+PSHTV_DECLARE_GL(glDeleteBuffers);
+PSHTV_DECLARE_GL(glDeleteShader);
+PSHTV_DECLARE_GL(glDeleteVertexArrays);
+PSHTV_DECLARE_GL(glDepthFunc);
+PSHTV_DECLARE_GL(glDrawArrays);
+PSHTV_DECLARE_GL(glEnable);
+PSHTV_DECLARE_GL(glEnableVertexAttribArray);
+PSHTV_DECLARE_GL(glFlush);
+PSHTV_DECLARE_GL(glGenBuffers);
+PSHTV_DECLARE_GL(glGenVertexArrays);
+PSHTV_DECLARE_GL(glGetAttribLocation);
+PSHTV_DECLARE_GL(glGetProgramInfoLog);
+PSHTV_DECLARE_GL(glGetProgramiv);
+PSHTV_DECLARE_GL(glGetShaderInfoLog);
+PSHTV_DECLARE_GL(glGetShaderiv);
+PSHTV_DECLARE_GL(glGetUniformLocation);
+PSHTV_DECLARE_GL(glLinkProgram);
+PSHTV_DECLARE_GL(glShaderSource);
+PSHTV_DECLARE_GL(glUniformMatrix4fv);
+PSHTV_DECLARE_GL(glUseProgram);
+PSHTV_DECLARE_GL(glVertexAttribPointer);
+PSHTV_DECLARE_GL(glViewport);
 
-#define LOAD_GL(T, X) p ## X = (T)pshtv_load_gl(#X)
+#define PSHTV_LOAD_GL(X) p ## X = (X ## _t)pshtv_load_gl(#X)
 void pshtv_load_gls() {
-    LOAD_GL(PFNGLENABLEPROC,                  glEnable);
-    LOAD_GL(PFNGLFLUSHPROC,                   glFlush);
-    LOAD_GL(PFNGLVIEWPORTPROC,                glViewport);
-    LOAD_GL(PFNGLDRAWARRAYSEXTPROC,           glDrawArrays);
-    LOAD_GL(PFNGLCLEARCOLORPROC,              glClearColor);
-    LOAD_GL(PFNGLCLEARPROC,                   glClear);
-    LOAD_GL(PFNGLCREATESHADERPROC,            glCreateShader);
-    LOAD_GL(PFNGLSHADERSOURCEPROC,            glShaderSource);
-    LOAD_GL(PFNGLCOMPILESHADERPROC,           glCompileShader);
-    LOAD_GL(PFNGLGETSHADERIVPROC,             glGetShaderiv);
-    LOAD_GL(PFNGLGETSHADERINFOLOGPROC,        glGetShaderInfoLog);
-    LOAD_GL(PFNGLCREATEPROGRAMPROC,           glCreateProgram);
-    LOAD_GL(PFNGLATTACHSHADERPROC,            glAttachShader);
-    LOAD_GL(PFNGLLINKPROGRAMPROC,             glLinkProgram);
-    LOAD_GL(PFNGLGETPROGRAMIVPROC,            glGetProgramiv);
-    LOAD_GL(PFNGLGETPROGRAMINFOLOGPROC,       glGetProgramInfoLog);
-    LOAD_GL(PFNGLDELETESHADERPROC,            glDeleteShader);
-    LOAD_GL(PFNGLUSEPROGRAMPROC,              glUseProgram);
-    LOAD_GL(PFNGLGENVERTEXARRAYSPROC,         glGenVertexArrays);
-    LOAD_GL(PFNGLDELETEVERTEXARRAYSPROC,      glDeleteVertexArrays);
-    LOAD_GL(PFNGLBINDVERTEXARRAYPROC,         glBindVertexArray);
-    LOAD_GL(PFNGLGENBUFFERSPROC,              glGenBuffers);
-    LOAD_GL(PFNGLDELETEBUFFERSPROC,           glDeleteBuffers);
-    LOAD_GL(PFNGLBINDBUFFERPROC,              glBindBuffer);
-    LOAD_GL(PFNGLBUFFERDATAPROC,              glBufferData);
-    LOAD_GL(PFNGLVERTEXATTRIBPOINTERPROC,     glVertexAttribPointer);
-    LOAD_GL(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray);
-    LOAD_GL(PFNGLGETATTRIBLOCATIONPROC,       glGetAttribLocation);
-    LOAD_GL(PFNGLUNIFORMMATRIX4FVPROC,        glUniformMatrix4fv);
-    LOAD_GL(PFNGLGETUNIFORMLOCATIONPROC,      glGetUniformLocation);
-    LOAD_GL(PFNGLUNIFORM4FVPROC,              glUniform4fv);
-    LOAD_GL(PFNGLBLENDFUNCPROC,               glBlendFunc);
-    LOAD_GL(PFNGLDEPTHFUNCPROC,               glDepthFunc);
-    LOAD_GL(PFNGLCLEARDEPTHPROC,              glClearDepth);
+    PSHTV_LOAD_GL(glAttachShader);
+    PSHTV_LOAD_GL(glBindBuffer);
+    PSHTV_LOAD_GL(glBindVertexArray);
+    PSHTV_LOAD_GL(glBlendFunc);
+    PSHTV_LOAD_GL(glBufferData);
+    PSHTV_LOAD_GL(glClear);
+    PSHTV_LOAD_GL(glClearColor);
+    PSHTV_LOAD_GL(glClearDepth);
+    PSHTV_LOAD_GL(glCompileShader);
+    PSHTV_LOAD_GL(glCreateProgram);
+    PSHTV_LOAD_GL(glCreateShader);
+    PSHTV_LOAD_GL(glDeleteBuffers);
+    PSHTV_LOAD_GL(glDeleteShader);
+    PSHTV_LOAD_GL(glDeleteVertexArrays);
+    PSHTV_LOAD_GL(glDepthFunc);
+    PSHTV_LOAD_GL(glDrawArrays);
+    PSHTV_LOAD_GL(glEnable);
+    PSHTV_LOAD_GL(glEnableVertexAttribArray);
+    PSHTV_LOAD_GL(glFlush);
+    PSHTV_LOAD_GL(glGenBuffers);
+    PSHTV_LOAD_GL(glGenVertexArrays);
+    PSHTV_LOAD_GL(glGetAttribLocation);
+    PSHTV_LOAD_GL(glGetProgramInfoLog);
+    PSHTV_LOAD_GL(glGetProgramiv);
+    PSHTV_LOAD_GL(glGetShaderInfoLog);
+    PSHTV_LOAD_GL(glGetShaderiv);
+    PSHTV_LOAD_GL(glGetUniformLocation);
+    PSHTV_LOAD_GL(glLinkProgram);
+    PSHTV_LOAD_GL(glShaderSource);
+    PSHTV_LOAD_GL(glUniformMatrix4fv);
+    PSHTV_LOAD_GL(glUseProgram);
+    PSHTV_LOAD_GL(glVertexAttribPointer);
+    PSHTV_LOAD_GL(glViewport);
 }
-#undef LOAD_GL
 
 uint32_t pshtv_prog_solid;
 uint32_t pshtv_prog_ellipse;
@@ -870,17 +897,6 @@ void pshtv_flush_all() {
     pshtv_flush_ellipses();
 }
 
-void fill_ellipse(float x, float y, float rx, float ry) {
-
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, -1 }, .z = pshtv_z };
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, +1 }, .z = pshtv_z };
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, +1 }, .z = pshtv_z };
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, -1 }, .z = pshtv_z };
-    ++pshtv_z;
-
-    if (pshtv_ellipse_verts_len == PSHTV_ELLIPSE_VERTS_CAP) pshtv_flush_ellipses();
-}
-
 void fill_rect(float x, float y, float w, float h) {
     pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y,    }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
     pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y,    }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
@@ -906,6 +922,17 @@ void fill_line(float x1, float y1, float x2, float y2, float w) {
     ++pshtv_z;
 
     if (pshtv_quad_verts_len == PSHTV_QUAD_VERTS_CAP) pshtv_flush_quads();
+}
+
+void fill_ellipse(float x, float y, float rx, float ry) {
+
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, -1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, +1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, +1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, -1 }, .z = pshtv_z };
+    ++pshtv_z;
+
+    if (pshtv_ellipse_verts_len == PSHTV_ELLIPSE_VERTS_CAP) pshtv_flush_ellipses();
 }
 
 void pshtv_mul_transform_matrix_by(float by[4][4]) {
