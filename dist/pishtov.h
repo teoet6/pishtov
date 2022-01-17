@@ -375,8 +375,8 @@ int pshtv_translate_key(int native) {
     case XK_KP_Enter:
     case XK_Return:         return 0x0d; // VK_RETURN 0x0D ENTER key
                             // --- 0x0E-0F Undefined
-                            // VK_SHIFT 0x10 SHIFT key
-                            // VK_CONTROL 0x11 CTRL key
+    case XK_Shift_L:        return 0x10; // VK_SHIFT 0x10 SHIFT key
+    case XK_Control_L:      return 0x11; // VK_CONTROL 0x11 CTRL key
     case XK_Alt_L:
     case XK_Alt_R:          return 0x12; // VK_MENU 0x12 ALT key
     case XK_Pause:          return 0x13; // VK_PAUSE 0x13 PAUSE key
@@ -536,9 +536,9 @@ int pshtv_translate_key(int native) {
     case XK_Scroll_Lock:    return 0x91; // VK_SCROLL 0x91 SCROLL LOCK key
                             // --- 0x92-96 OEM specific
                             // --- 0x97-9F Unassigned
-    case XK_Shift_L:        return 0xa0; // VK_LSHIFT 0xA0 Left SHIFT key
+    // case XK_Shift_L:        return 0xa0; // VK_LSHIFT 0xA0 Left SHIFT key
     case XK_Shift_R:        return 0xa1; // VK_RSHIFT 0xA1 Right SHIFT key
-    case XK_Control_L:      return 0xa2; // VK_LCONTROL 0xA2 Left CONTROL key
+    // case XK_Control_L:      return 0xa2; // VK_LCONTROL 0xA2 Left CONTROL key
     case XK_Control_R:      return 0xa3; // VK_RCONTROL 0xA3 Right CONTROL key
                             // VK_LMENU 0xA4 Left MENU key
     case XK_Menu:           return 0xa5; // VK_RMENU 0xA5 Right MENU key
