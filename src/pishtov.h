@@ -1026,7 +1026,7 @@ void pshtv_init_opengl() {
         uniform mat4 u_transform;
 
         void main() {
-            gl_Position = u_transform * vec4(in_pos, in_z / 10000000.f, 1.0);
+            gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);
             ex_col = in_col;
         }
     )XXX";
@@ -1056,7 +1056,7 @@ void pshtv_init_opengl() {
         uniform mat4 u_transform;
 
         void main() {
-            gl_Position = u_transform * vec4(in_pos, in_z / 10000000.f, 1.0);
+            gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);
             ex_corner = in_corner;
             ex_col = in_col;
         }
