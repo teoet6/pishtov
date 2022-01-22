@@ -758,11 +758,8 @@ void pshtv_load_gls() {
     PSHTV_LOAD_GL(glViewport);
 }
 
-uint32_t pshtv_prog_solid;
-uint32_t pshtv_prog_ellipse;
-
-uint32_t pshtv_compile_shader(const char *src, GLenum type) {
-    uint32_t shader = pglCreateShader(type);
+GLuint pshtv_compile_shader(const char *src, GLenum type) {
+    GLuint shader = pglCreateShader(type);
 
     pglShaderSource(shader, 1, &src, NULL);
     pglCompileShader(shader);
@@ -778,17 +775,17 @@ uint32_t pshtv_compile_shader(const char *src, GLenum type) {
     return shader;
 }
 
-uint32_t pshtv_simple_shader_prog(const char *vertex_src, const char *fragment_src) {
-    uint32_t prog = pglCreateProgram();
+GLuint pshtv_make_shader_prog(const char *vertex_src, const char *fragment_src) {
+    GLuint prog = pglCreateProgram();
 
-    uint32_t vertex_shader = pshtv_compile_shader(vertex_src, GL_VERTEX_SHADER);
-    uint32_t fragment_shader = pshtv_compile_shader(fragment_src, GL_FRAGMENT_SHADER);
+    GLuint vertex_shader = pshtv_compile_shader(vertex_src, GL_VERTEX_SHADER);
+    GLuint fragment_shader = pshtv_compile_shader(fragment_src, GL_FRAGMENT_SHADER);
 
     pglAttachShader(prog, vertex_shader);
     pglAttachShader(prog, fragment_shader);
     pglLinkProgram(prog);
 
-    int success;
+    GLint success;
     pglGetProgramiv(prog, GL_LINK_STATUS, &success);
     if (!success) {
         char info[512];
@@ -823,7 +820,36 @@ struct Pshtv_Quad_Vert pshtv_quad_verts[PSHTV_QUAD_VERTS_CAP];
 void pshtv_flush_quads() {
     if (!pshtv_quad_verts_len) return;
 
-    pglUseProgram(pshtv_prog_solid);
+    static GLuint shader_prog;
+    if (!shader_prog) {
+        shader_prog = pshtv_make_shader_prog(
+            "#version 130\n"
+
+            "in vec2 in_pos;\n"
+            "in vec4 in_col;\n"
+            "in float in_z;\n"
+
+            "out vec4 ex_col;\n"
+
+            "uniform mat4 u_transform;\n"
+
+            "void main() {\n"
+            "    gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);\n"
+            "    ex_col = in_col;\n"
+            "}\n",
+
+
+            "#version 130\n"
+
+            "in vec4 ex_col;\n"
+
+            "void main() {\n"
+            "    gl_FragColor = ex_col;\n"
+            "}\n"
+        );
+    }
+
+    pglUseProgram(shader_prog);
 
     GLuint vao, vbo;
 
@@ -834,11 +860,11 @@ void pshtv_flush_quads() {
     pglBindBuffer(GL_ARRAY_BUFFER, vbo);
     pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Quad_Vert) * pshtv_quad_verts_len, pshtv_quad_verts, GL_STREAM_DRAW);
 
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_solid, "in_pos", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, pos);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_solid, "in_col", 4, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, col);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_solid, "in_z",   1, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, z);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_pos", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_col", 4, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_z",   1, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, z);
 
-    GLint u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
+    GLint u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
@@ -864,7 +890,42 @@ struct Pshtv_Ellipse_Vert pshtv_ellipse_verts[PSHTV_ELLIPSE_VERTS_CAP];
 void pshtv_flush_ellipses() {
     if (!pshtv_ellipse_verts_len) return;
 
-    pglUseProgram(pshtv_prog_ellipse);
+    static GLuint shader_prog;
+    if (!shader_prog) {
+        shader_prog = pshtv_make_shader_prog(
+            "#version 130\n"
+
+            "in vec2 in_pos;\n"
+            "in vec2 in_corner;\n"
+            "in vec4 in_col;\n"
+            "in float in_z;\n"
+
+            "out vec2 ex_corner;\n"
+            "out vec4 ex_col;\n"
+
+            "uniform mat4 u_transform;\n"
+
+            "void main() {\n"
+            "    gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);\n"
+            "    ex_corner = in_corner;\n"
+            "    ex_col = in_col;\n"
+            "}\n",
+
+
+            "#version 130\n"
+
+            "in vec2 ex_corner;\n"
+            "in vec4 ex_col;\n"
+
+            "void main() {\n"
+            "    if (dot(ex_corner, ex_corner) > 1.0)\n"
+            "        discard;\n"
+            "    gl_FragColor = ex_col;\n"
+            "}\n"
+        );
+    }
+
+    pglUseProgram(shader_prog);
 
     GLuint vao, vbo;
 
@@ -875,12 +936,12 @@ void pshtv_flush_ellipses() {
     pglBindBuffer(GL_ARRAY_BUFFER, vbo);
     pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Ellipse_Vert) * pshtv_ellipse_verts_len, pshtv_ellipse_verts, GL_STREAM_DRAW);
 
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_pos",    2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, pos);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_col",    4, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, col);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_corner", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, corner);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(pshtv_prog_ellipse, "in_z",      1, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, z);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_pos",    2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_col",    4, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_corner", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, corner);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_z",      1, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, z);
 
-    GLint u_transform = pglGetUniformLocation(pshtv_prog_solid, "u_transform");
+    GLint u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
@@ -1013,67 +1074,6 @@ void pshtv_init_opengl() {
 
     pglEnable(GL_DEPTH_TEST);
     pglDepthFunc(GL_GEQUAL);
-
-    const char *vertex_src_solid = R"XXX(
-        #version 130
-
-        in vec2 in_pos;
-        in vec4 in_col;
-        in float in_z;
-
-        out vec4 ex_col;
-
-        uniform mat4 u_transform;
-
-        void main() {
-            gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);
-            ex_col = in_col;
-        }
-    )XXX";
-    const char *fragment_src_solid = R"XXX(
-        #version 130
-
-        in vec4 ex_col;
-
-        void main() {
-            gl_FragColor = ex_col;
-        }
-    )XXX";
-    pshtv_prog_solid = pshtv_simple_shader_prog(vertex_src_solid, fragment_src_solid);
-
-    // TODO anti-aliasing
-    const char *vertex_src_ellipse = R"XXX(
-        #version 130
-
-        in vec2 in_pos;
-        in vec2 in_corner;
-        in vec4 in_col;
-        in float in_z;
-
-        out vec2 ex_corner;
-        out vec4 ex_col;
-
-        uniform mat4 u_transform;
-
-        void main() {
-            gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);
-            ex_corner = in_corner;
-            ex_col = in_col;
-        }
-    )XXX";
-    const char *fragment_src_ellipse = R"XXX(
-        #version 130
-
-        in vec2 ex_corner;
-        in vec4 ex_col;
-
-        void main() {
-            if (dot(ex_corner, ex_corner) > 1.0)
-                discard;
-            gl_FragColor = ex_col;
-        }
-    )XXX";
-    pshtv_prog_ellipse = pshtv_simple_shader_prog(vertex_src_ellipse, fragment_src_ellipse);
 }
 
 // This part of Pishtov defines the main game loop.

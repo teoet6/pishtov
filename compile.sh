@@ -9,4 +9,4 @@ cat \
 
 cp src/game.c dist/game.c
 
-time gcc -ldl -lX11 -lGL -lm -O2 -o bin/game dist/game.c
+time gcc --std=c11 dist/game.c -ldl -lX11 -lGL -lm -O2 -o bin/game
