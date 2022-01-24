@@ -21,8 +21,8 @@ SOFTWARE.
 */
 
 /*
-Pishtov is a C header that mimics Yashu's JS Pishtov. It tries not only
-to be faster by being written in C but to also be more powerful.
+Pishtov is a C header that mimics Yashu's JS Pishtov. It tries not only to be
+faster by being written in C but to also be more powerful.
 
 The point of the JS Pishtov is to remove the boilerplate from game programming
 and thus make it easy to teach children programming. The JS Pishtov is very
@@ -35,21 +35,15 @@ other most prevalent programming material in Bulgaria - competitive
 programming - it's hard to teach games to competitive programmers and even
 harder to teach cp to game programmers.
 
-This Pishtov tries to retain the ease-of-use for new programmers, but also to
-allow skilled programmers to create faster and bigger games and simulations.
-Another goal of this Pishtov is to expand the material learned from the
-original JS Pishtov with materials like files, threading, network programming,
-and more.
+Pishtov tries to retain the ease-of-use for new programmers, but also to
+allow skilled programmers to create faster and bigger games and simulations. By
+virtue of being written in a systems lannguage it expands the toolkit of the
+programmer with files, threading, stricter typechecking, pointers and much
+more.
 
-An extra goal is being able to be compiled in a default Code::Block Windows
-install i.e. without changing any linker or compiler settings. This is
-important in order to retain the no-boilerplate policy of the JS Pishtov.
-Originally all you had to do is edit game.js and open start.html in a browser.
-Similarly all you should do with the C Pishtov is edit game.c, compile and
-run. Making the end-user (who is possibly a child) edit linker settings before
-compiling his game breaks this workflow.
-
-An extra extra goal is compiling to WASM and Android.
+This project's purpouse is currently ill-defined. The line between feature
+creep and actual feature is very blurry. As such I frequently move code between
+the actual header file and the example usage.
 
 TODO In no particular order
     [ ] Have a build system that expands `#include ""` and creates the final header file instead of writing everything in one file.
@@ -109,12 +103,13 @@ float window_w, window_h; // Automatically set to the window dimensions
 // The other part of the pishtov deals with actually drawing using OpenGL
 // It defines the following functions and variables:
 float pshtv_transform_matrix[4][4];
-float fill_color[4];
+float pshtv_fill_color[4];
 
-void fill_ellipse(float x, float y, float rx, float ry);
+void fill_color();
 void fill_rect(float x, float y, float w, float h);
 void fill_line(float x1, float y1, float x2, float y2, float w);
-void draw_image(void *data, int data_w, int data_h, float x, float y, float w, float h);
+void fill_ellipse(float x, float y, float rx, float ry);
+void draw_image(char *filename, float x, float y, float w, float h);
 void translate(float x, float y);
 void scale(float x, float y);
 void rotate(float a);
@@ -802,9 +797,8 @@ GLuint pshtv_make_shader_prog(const char *vertex_src, const char *fragment_src) 
 float pshtv_z;
 
 #define PSHTV_PASS_FIELD_AS_ATTRIBUTE(SHADER, ATTRIBUTE, SIZE, TYPE, NORMALIZED, STRUCT, FIELD) { \
-    GLint attribute_index = pglGetAttribLocation(SHADER, ATTRIBUTE); \
-    pglVertexAttribPointer(attribute_index, SIZE, TYPE, NORMALIZED, sizeof(STRUCT), (void*)offsetof(STRUCT, FIELD)); \
-    pglEnableVertexAttribArray(attribute_index); \
+    pglVertexAttribPointer(ATTRIBUTE, SIZE, TYPE, NORMALIZED, sizeof(STRUCT), (void*)offsetof(STRUCT, FIELD)); \
+    pglEnableVertexAttribArray(ATTRIBUTE); \
 }
 
 struct Pshtv_Quad_Vert {
@@ -821,6 +815,7 @@ void pshtv_flush_quads() {
     if (!pshtv_quad_verts_len) return;
 
     static GLuint shader_prog;
+    static GLint in_pos, in_col, in_z, u_transform;
     if (!shader_prog) {
         shader_prog = pshtv_make_shader_prog(
             "#version 130\n"
@@ -847,6 +842,11 @@ void pshtv_flush_quads() {
             "    gl_FragColor = ex_col;\n"
             "}\n"
         );
+
+        in_pos = pglGetAttribLocation(shader_prog, "in_pos");
+        in_col = pglGetAttribLocation(shader_prog, "in_col");
+        in_z   = pglGetAttribLocation(shader_prog, "in_z");
+        u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     }
 
     pglUseProgram(shader_prog);
@@ -860,11 +860,10 @@ void pshtv_flush_quads() {
     pglBindBuffer(GL_ARRAY_BUFFER, vbo);
     pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Quad_Vert) * pshtv_quad_verts_len, pshtv_quad_verts, GL_STREAM_DRAW);
 
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_pos", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, pos);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_col", 4, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, col);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_z",   1, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, z);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_pos, 2, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_col, 4, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_z,   1, GL_FLOAT, GL_FALSE, struct Pshtv_Quad_Vert, z);
 
-    GLint u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
@@ -891,6 +890,7 @@ void pshtv_flush_ellipses() {
     if (!pshtv_ellipse_verts_len) return;
 
     static GLuint shader_prog;
+    static GLint in_pos, in_col, in_corner, in_z, u_transform;
     if (!shader_prog) {
         shader_prog = pshtv_make_shader_prog(
             "#version 130\n"
@@ -923,6 +923,12 @@ void pshtv_flush_ellipses() {
             "    gl_FragColor = ex_col;\n"
             "}\n"
         );
+
+        in_pos    = pglGetAttribLocation(shader_prog, "in_pos");
+        in_col    = pglGetAttribLocation(shader_prog, "in_col");
+        in_corner = pglGetAttribLocation(shader_prog, "in_corner");
+        in_z      = pglGetAttribLocation(shader_prog, "in_z");
+        u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     }
 
     pglUseProgram(shader_prog);
@@ -936,12 +942,11 @@ void pshtv_flush_ellipses() {
     pglBindBuffer(GL_ARRAY_BUFFER, vbo);
     pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Ellipse_Vert) * pshtv_ellipse_verts_len, pshtv_ellipse_verts, GL_STREAM_DRAW);
 
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_pos",    2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, pos);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_col",    4, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, col);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_corner", 2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, corner);
-    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, "in_z",      1, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, z);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_pos,    2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_col,    4, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_corner, 2, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, corner);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_z,      1, GL_FLOAT, GL_FALSE, struct Pshtv_Ellipse_Vert, z);
 
-    GLint u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
     pglEnableVertexAttribArray(u_transform);
 
@@ -958,11 +963,18 @@ void pshtv_flush_all() {
     pshtv_flush_ellipses();
 }
 
+void fill_color(uint32_t c) {
+    pshtv_fill_color[0] =     (c >> 16 & 0xff) / 255.f;
+    pshtv_fill_color[1] =     (c >>  8 & 0xff) / 255.f;
+    pshtv_fill_color[2] =     (c       & 0xff) / 255.f;
+    pshtv_fill_color[3] = 1 - (c >> 24 & 0xff) / 255.f;
+}
+
 void fill_rect(float x, float y, float w, float h) {
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y,    }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y,    }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y + h }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y + h }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y,    }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y,    }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y + h }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y + h }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
     ++pshtv_z;
 
     if (pshtv_quad_verts_len == PSHTV_QUAD_VERTS_CAP) pshtv_flush_quads();
@@ -976,10 +988,10 @@ void fill_line(float x1, float y1, float x2, float y2, float w) {
     const float x3 = w * .5 * -y0 / len;
     const float y3 = w * .5 *  x0 / len;
 
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x1 - x3, y1 - y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x1 + x3, y1 + y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x2 + x3, y2 + y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x2 - x3, y2 - y3 }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x1 - x3, y1 - y3 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x1 + x3, y1 + y3 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x2 + x3, y2 + y3 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x2 - x3, y2 - y3 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
     ++pshtv_z;
 
     if (pshtv_quad_verts_len == PSHTV_QUAD_VERTS_CAP) pshtv_flush_quads();
@@ -987,10 +999,10 @@ void fill_line(float x1, float y1, float x2, float y2, float w) {
 
 void fill_ellipse(float x, float y, float rx, float ry) {
 
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, -1 }, .z = pshtv_z };
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { -1, +1 }, .z = pshtv_z };
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y + ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, +1 }, .z = pshtv_z };
-    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y - ry, }, .col = { fill_color[0], fill_color[1], fill_color[2], fill_color[3] }, .corner = { +1, -1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y - ry, }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .corner = { -1, -1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x - rx, y + ry, }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .corner = { -1, +1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y + ry, }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .corner = { +1, +1 }, .z = pshtv_z };
+    pshtv_ellipse_verts[pshtv_ellipse_verts_len++] = (struct Pshtv_Ellipse_Vert){ .pos = { x + rx, y - ry, }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .corner = { +1, -1 }, .z = pshtv_z };
     ++pshtv_z;
 
     if (pshtv_ellipse_verts_len == PSHTV_ELLIPSE_VERTS_CAP) pshtv_flush_ellipses();
@@ -1056,7 +1068,7 @@ void pshtv_redraw() {
     translate(-1, 1);
     scale(2 / window_w, -2 / window_h);
 
-    fill_color[0] = 0; fill_color[1] = 0; fill_color[2] = 1; fill_color[3] = 1;
+    pshtv_fill_color[0] = 0; pshtv_fill_color[1] = 0; pshtv_fill_color[2] = 1; pshtv_fill_color[3] = 1;
 
     pshtv_z = 0;
 
@@ -1077,7 +1089,6 @@ void pshtv_init_opengl() {
 }
 
 // This part of Pishtov defines the main game loop.
-
 int main() {
     pshtv_open_window("Igra", 800, 600);
     pshtv_init_opengl();
