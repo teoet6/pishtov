@@ -12,18 +12,18 @@ void update() {
     my_y += (mouse_y - my_y) / 10;
 }
 
-void draw() {
-    for (int i = 0; i < 30; ++i) {
-        for (int j = 0; j < 30; ++j) {
-            pshtv_fill_color[0] = i / 30.f;
-            pshtv_fill_color[1] = j / 30.f;
-            pshtv_fill_color[2] = 1.f;
-            fill_rect(j * 20, i * 20, 15, 15);
-        }
-    }
+#define WHITE 0xff, 0xff, 0xff, 0xff
+#define GREEN 0x00, 0xff, 0x00, 0xff
+#define RED   0xff, 0x00, 0x00, 0xff
 
-    fill_color(0xffffff);
-    fill_ellipse(my_x, my_y, 15, 15);
+void draw() {
+    uint8_t flag[] = {
+        WHITE, WHITE, WHITE, WHITE,
+        GREEN, GREEN, GREEN, GREEN,
+        RED,   RED,   RED,   RED,
+    };
+
+    draw_image_buffer(flag, 4, 3, my_x, my_y, 40, 30);
 }
 
 void keydown(int key) {

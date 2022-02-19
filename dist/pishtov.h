@@ -109,6 +109,7 @@ void fill_color();
 void fill_rect(float x, float y, float w, float h);
 void fill_line(float x1, float y1, float x2, float y2, float w);
 void fill_ellipse(float x, float y, float rx, float ry);
+void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x, float y, float w, float h);
 void draw_image(char *filename, float x, float y, float w, float h);
 void translate(float x, float y);
 void scale(float x, float y);
@@ -179,18 +180,13 @@ LRESULT CALLBACK pshtv_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
     case WM_LBUTTONUP: mouseup(1); return 0;
     case WM_MBUTTONUP: mouseup(2); return 0;
     case WM_RBUTTONUP: mouseup(3); return 0;
-    case WM_KEYDOWN:
-                       keydown(wparam);
-                       return 0;
-    case WM_KEYUP:
-                       keyup(wparam);
-                       return 0;
+    case WM_KEYDOWN: keydown(wparam); return 0;
+    case WM_KEYUP:   keyup  (wparam); return 0;
     case WM_SIZE:
-                       window_w = LOWORD(lparam);
-                       window_h = HIWORD(lparam);
-                       return 0;
-    case WM_QUIT:
-                       exit(0);
+        window_w = LOWORD(lparam);
+        window_h = HIWORD(lparam);
+        return 0;
+    case WM_QUIT: exit(0);
     }
     return DefWindowProc(hwnd, msg, wparam, lparam);
 }
@@ -680,6 +676,12 @@ typedef void (*glUniformMatrix4fv_t) (GLint location, GLsizei count, GLboolean t
 typedef void (*glUseProgram_t) (GLuint program);
 typedef void (*glVertexAttribPointer_t) (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer);
 typedef void (*glViewport_t) (GLint x, GLint y, GLsizei width, GLsizei height);
+typedef void (*glGenTextures_t) (GLsizei n, GLuint *textures);
+typedef void (*glBindTexture_t) (GLenum target, GLuint texture);
+typedef void (*glTexImage2D_t) (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void * data);
+typedef void (*glDeleteTextures_t) (GLsizei n, const GLuint * textures);
+typedef void (*glTexParameteri_t) (GLenum target, GLenum pname, GLint param);
+typedef void (*glGenerateMipmap_t) (GLenum target);
 
 #define PSHTV_DECLARE_GL(X) X ## _t p ## X
 PSHTV_DECLARE_GL(glAttachShader);
@@ -715,6 +717,12 @@ PSHTV_DECLARE_GL(glUniformMatrix4fv);
 PSHTV_DECLARE_GL(glUseProgram);
 PSHTV_DECLARE_GL(glVertexAttribPointer);
 PSHTV_DECLARE_GL(glViewport);
+PSHTV_DECLARE_GL(glGenTextures);
+PSHTV_DECLARE_GL(glBindTexture);
+PSHTV_DECLARE_GL(glTexImage2D);
+PSHTV_DECLARE_GL(glDeleteTextures);
+PSHTV_DECLARE_GL(glTexParameteri);
+PSHTV_DECLARE_GL(glGenerateMipmap);
 
 #define PSHTV_LOAD_GL(X) p ## X = (X ## _t)pshtv_load_gl(#X)
 void pshtv_load_gls() {
@@ -751,6 +759,12 @@ void pshtv_load_gls() {
     PSHTV_LOAD_GL(glUseProgram);
     PSHTV_LOAD_GL(glVertexAttribPointer);
     PSHTV_LOAD_GL(glViewport);
+    PSHTV_LOAD_GL(glGenTextures);
+    PSHTV_LOAD_GL(glBindTexture);
+    PSHTV_LOAD_GL(glTexImage2D);
+    PSHTV_LOAD_GL(glDeleteTextures);
+    PSHTV_LOAD_GL(glTexParameteri);
+    PSHTV_LOAD_GL(glGenerateMipmap);
 }
 
 GLuint pshtv_compile_shader(const char *src, GLenum type) {
@@ -829,7 +843,7 @@ void pshtv_flush_quads() {
             "uniform mat4 u_transform;\n"
 
             "void main() {\n"
-            "    gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);\n"
+            "    gl_Position = u_transform * vec4(in_pos, in_z / 1000000.0, 1.0);\n"
             "    ex_col = in_col;\n"
             "}\n",
 
@@ -963,6 +977,91 @@ void pshtv_flush_all() {
     pshtv_flush_ellipses();
 }
 
+void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x, float y, float w, float h) {
+    static GLuint shader_prog;
+    static GLint in_pos, in_tex_coord, in_z, u_transform;
+    if (!shader_prog) {
+        shader_prog = pshtv_make_shader_prog(
+            "#version 130\n"
+
+            "in vec2 in_pos;\n"
+            "in vec2 in_tex_coord;\n"
+            "in float in_z;\n"
+
+            "out vec2 ex_tex_coord;\n"
+
+            "uniform mat4 u_transform;\n"
+
+            "void main() {\n"
+            "    gl_Position = u_transform * vec4(in_pos, in_z / 1000000.f, 1.0);\n"
+            "    ex_tex_coord = in_tex_coord;\n"
+            "}\n",
+
+
+            "#version 130\n"
+
+            "in vec2 ex_tex_coord;\n"
+            "uniform sampler2D sampler\n;"
+
+            "void main() {\n"
+            "    gl_FragColor = vec4(texture(sampler, ex_tex_coord).rgb, 1.0);\n"
+            // "    gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);\n"
+            "}\n"
+        );
+
+        in_pos       = pglGetAttribLocation(shader_prog, "in_pos");
+        in_tex_coord = pglGetAttribLocation(shader_prog, "in_corner");
+        in_z         = pglGetAttribLocation(shader_prog, "in_z");
+        u_transform = pglGetUniformLocation(shader_prog, "u_transform");
+    }
+
+    pglUseProgram(shader_prog);
+
+    GLuint vao, vbo, texture;
+
+    pglGenVertexArrays(1, &vao);
+    pglBindVertexArray(vao);
+
+    pglGenTextures(1, &texture);
+    pglBindTexture(GL_TEXTURE_2D, texture);
+    pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
+    pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    pglTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_w, img_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+    pglGenerateMipmap(GL_TEXTURE_2D);
+
+    struct Image_Quad_Vert {
+        float pos[2];
+        float tex_coord[2];
+        float z;
+    };
+    const struct Image_Quad_Vert img_quad[] = {
+        { .pos = { x,     y     }, .tex_coord = { 0, 0 }, .z = pshtv_z },
+        { .pos = { x + w, y     }, .tex_coord = { 1, 0 }, .z = pshtv_z },
+        { .pos = { x + w, y + h }, .tex_coord = { 1, 1 }, .z = pshtv_z },
+        { .pos = { x,     y + h }, .tex_coord = { 0, 1 }, .z = pshtv_z },
+    };
+    ++pshtv_z;
+
+    pglGenBuffers(1, &vbo);
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(img_quad), img_quad, GL_STREAM_DRAW);
+
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_pos,       2, GL_FLOAT, GL_FALSE, struct Image_Quad_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_tex_coord, 2, GL_FLOAT, GL_FALSE, struct Image_Quad_Vert, tex_coord);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_z,         1, GL_FLOAT, GL_FALSE, struct Image_Quad_Vert, z);
+
+    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
+    pglEnableVertexAttribArray(u_transform);
+
+    pglDrawArrays(GL_QUADS, 0, 4);
+
+    pglDeleteTextures(1, &texture);
+    pglDeleteBuffers(1, &vbo);
+    pglDeleteVertexArrays(1, &vao);
+}
+
 void fill_color(uint32_t c) {
     pshtv_fill_color[0] =     (c >> 16 & 0xff) / 255.f;
     pshtv_fill_color[1] =     (c >>  8 & 0xff) / 255.f;
@@ -971,8 +1070,8 @@ void fill_color(uint32_t c) {
 }
 
 void fill_rect(float x, float y, float w, float h) {
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y,    }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
-    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y,    }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y     }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y     }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
     pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x + w, y + h }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
     pshtv_quad_verts[pshtv_quad_verts_len++] = (struct Pshtv_Quad_Vert){ .pos = { x,     y + h }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
     ++pshtv_z;
@@ -1057,9 +1156,6 @@ void pshtv_redraw() {
     pglClearColor(1.0, 1.0, 1.0, 1.0);
     pglClearDepth(0.0);
     pglClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    float q = 2 / window_w;
-    float p = 2 / window_h;
 
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
