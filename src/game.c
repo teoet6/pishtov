@@ -17,6 +17,9 @@ void update() {
 #define RED   0xff, 0x00, 0x00, 0xff
 
 void draw() {
+    fill_color(0x000040);
+    fill_rect(0, 0, window_w, window_h);
+
     uint8_t flag[] = {
         WHITE, WHITE, WHITE, WHITE,
         GREEN, GREEN, GREEN, GREEN,

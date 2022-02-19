@@ -681,7 +681,6 @@ typedef void (*glBindTexture_t) (GLenum target, GLuint texture);
 typedef void (*glTexImage2D_t) (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void * data);
 typedef void (*glDeleteTextures_t) (GLsizei n, const GLuint * textures);
 typedef void (*glTexParameteri_t) (GLenum target, GLenum pname, GLint param);
-typedef void (*glGenerateMipmap_t) (GLenum target);
 
 #define PSHTV_DECLARE_GL(X) X ## _t p ## X
 PSHTV_DECLARE_GL(glAttachShader);
@@ -722,7 +721,6 @@ PSHTV_DECLARE_GL(glBindTexture);
 PSHTV_DECLARE_GL(glTexImage2D);
 PSHTV_DECLARE_GL(glDeleteTextures);
 PSHTV_DECLARE_GL(glTexParameteri);
-PSHTV_DECLARE_GL(glGenerateMipmap);
 
 #define PSHTV_LOAD_GL(X) p ## X = (X ## _t)pshtv_load_gl(#X)
 void pshtv_load_gls() {
@@ -764,7 +762,6 @@ void pshtv_load_gls() {
     PSHTV_LOAD_GL(glTexImage2D);
     PSHTV_LOAD_GL(glDeleteTextures);
     PSHTV_LOAD_GL(glTexParameteri);
-    PSHTV_LOAD_GL(glGenerateMipmap);
 }
 
 GLuint pshtv_compile_shader(const char *src, GLenum type) {
@@ -1010,7 +1007,7 @@ void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x,
         );
 
         in_pos       = pglGetAttribLocation(shader_prog, "in_pos");
-        in_tex_coord = pglGetAttribLocation(shader_prog, "in_corner");
+        in_tex_coord = pglGetAttribLocation(shader_prog, "in_tex_coord");
         in_z         = pglGetAttribLocation(shader_prog, "in_z");
         u_transform = pglGetUniformLocation(shader_prog, "u_transform");
     }
@@ -1023,13 +1020,11 @@ void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x,
     pglBindVertexArray(vao);
 
     pglGenTextures(1, &texture);
+
     pglBindTexture(GL_TEXTURE_2D, texture);
-    pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
-    pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     pglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     pglTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_w, img_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-    pglGenerateMipmap(GL_TEXTURE_2D);
 
     struct Image_Quad_Vert {
         float pos[2];
