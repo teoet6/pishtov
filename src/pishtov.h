@@ -52,7 +52,7 @@ TODO In no particular order
     [X] Circles and Ellipses
     [ ] Arcs i.e. semicircles and semiellipses
     [X] Lines
-    [ ] Images
+    [X] Images
     [ ] Text
     [X] Translation, scaling and rotation of the canvas
     [ ] OS-independent network-programming
