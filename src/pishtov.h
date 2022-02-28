@@ -109,6 +109,7 @@ void fill_color();
 void fill_rect(float x, float y, float w, float h);
 void fill_line(float x1, float y1, float x2, float y2, float w);
 void fill_ellipse(float x, float y, float rx, float ry);
+void fill_triangle(float x1, float y1, float x2, float y2, float x3, float y3);
 void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x, float y, float w, float h);
 void draw_image(char *filename, float x, float y, float w, float h);
 void translate(float x, float y);
@@ -818,7 +819,7 @@ struct Pshtv_Quad_Vert {
     float z;
 };
 
-#define PSHTV_QUAD_VERTS_CAP 4096 * 4
+#define PSHTV_QUAD_VERTS_CAP (4096 * 4)
 size_t pshtv_quad_verts_len;
 struct Pshtv_Quad_Vert pshtv_quad_verts[PSHTV_QUAD_VERTS_CAP];
 
@@ -893,7 +894,7 @@ struct Pshtv_Ellipse_Vert {
     float z;
 };
 
-#define PSHTV_ELLIPSE_VERTS_CAP 4096 * 4
+#define PSHTV_ELLIPSE_VERTS_CAP (4096 * 4)
 size_t pshtv_ellipse_verts_len;
 struct Pshtv_Ellipse_Vert pshtv_ellipse_verts[PSHTV_ELLIPSE_VERTS_CAP];
 
@@ -969,9 +970,84 @@ void pshtv_flush_ellipses() {
     pshtv_ellipse_verts_len = 0;
 }
 
+struct Pshtv_Triangle_Vert {
+    float pos[2];
+    float col[4];
+    float z;
+};
+
+#define PSHTV_TRIANGLE_VERTS_CAP (4096 * 3)
+size_t pshtv_triangle_verts_len;
+struct Pshtv_Triangle_Vert pshtv_triangle_verts[PSHTV_TRIANGLE_VERTS_CAP];
+
+void pshtv_flush_triangles() {
+    if (!pshtv_triangle_verts_len) return;
+
+    static GLuint shader_prog;
+    static GLint in_pos, in_col, in_z, u_transform;
+    if (!shader_prog) {
+        shader_prog = pshtv_make_shader_prog(
+            "#version 130\n"
+
+            "in vec2 in_pos;\n"
+            "in vec4 in_col;\n"
+            "in float in_z;\n"
+
+            "out vec4 ex_col;\n"
+
+            "uniform mat4 u_transform;\n"
+
+            "void main() {\n"
+            "    gl_Position = u_transform * vec4(in_pos, in_z / 1000000.0, 1.0);\n"
+            "    ex_col = in_col;\n"
+            "}\n",
+
+
+            "#version 130\n"
+
+            "in vec4 ex_col;\n"
+
+            "void main() {\n"
+            "    gl_FragColor = ex_col;\n"
+            "}\n"
+        );
+
+        in_pos    = pglGetAttribLocation(shader_prog, "in_pos");
+        in_col    = pglGetAttribLocation(shader_prog, "in_col");
+        in_z      = pglGetAttribLocation(shader_prog, "in_z");
+        u_transform = pglGetUniformLocation(shader_prog, "u_transform");
+    }
+
+    pglUseProgram(shader_prog);
+
+    GLuint vao, vbo;
+
+    pglGenVertexArrays(1, &vao);
+    pglBindVertexArray(vao);
+
+    pglGenBuffers(1, &vbo);
+    pglBindBuffer(GL_ARRAY_BUFFER, vbo);
+    pglBufferData(GL_ARRAY_BUFFER, sizeof(struct Pshtv_Triangle_Vert) * pshtv_triangle_verts_len, pshtv_triangle_verts, GL_STREAM_DRAW);
+
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_pos,    2, GL_FLOAT, GL_FALSE, struct Pshtv_Triangle_Vert, pos);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_col,    4, GL_FLOAT, GL_FALSE, struct Pshtv_Triangle_Vert, col);
+    PSHTV_PASS_FIELD_AS_ATTRIBUTE(shader_prog, in_z,      1, GL_FLOAT, GL_FALSE, struct Pshtv_Triangle_Vert, z);
+
+    pglUniformMatrix4fv(u_transform, 1, GL_TRUE, (const float*)pshtv_transform_matrix);
+    pglEnableVertexAttribArray(u_transform);
+
+    pglDrawArrays(GL_TRIANGLES, 0, pshtv_triangle_verts_len);
+
+    pglDeleteBuffers(1, &vbo);
+    pglDeleteVertexArrays(1, &vao);
+
+    pshtv_triangle_verts_len = 0;
+}
+
 void pshtv_flush_all() {
     pshtv_flush_quads();
     pshtv_flush_ellipses();
+    pshtv_flush_triangles();
 }
 
 void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x, float y, float w, float h) {
@@ -1101,6 +1177,16 @@ void fill_ellipse(float x, float y, float rx, float ry) {
 
     if (pshtv_ellipse_verts_len == PSHTV_ELLIPSE_VERTS_CAP) pshtv_flush_ellipses();
 }
+
+void fill_triangle(float x1, float y1, float x2, float y2, float x3, float y3) {
+    pshtv_triangle_verts[pshtv_triangle_verts_len++] = (struct Pshtv_Triangle_Vert){ .pos = { x1, y1 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_triangle_verts[pshtv_triangle_verts_len++] = (struct Pshtv_Triangle_Vert){ .pos = { x2, y2 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    pshtv_triangle_verts[pshtv_triangle_verts_len++] = (struct Pshtv_Triangle_Vert){ .pos = { x3, y3 }, .col = { pshtv_fill_color[0], pshtv_fill_color[1], pshtv_fill_color[2], pshtv_fill_color[3] }, .z = pshtv_z };
+    ++pshtv_z;
+
+    if (pshtv_triangle_verts_len == PSHTV_TRIANGLE_VERTS_CAP) pshtv_flush_triangles();
+}
+
 
 void pshtv_mul_transform_matrix_by(float by[4][4]) {
     pshtv_flush_all();
