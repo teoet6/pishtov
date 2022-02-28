@@ -105,7 +105,7 @@ float window_w, window_h; // Automatically set to the window dimensions
 float pshtv_transform_matrix[4][4];
 float pshtv_fill_color[4];
 
-void fill_color();
+void fill_color(uint32_t c);
 void fill_rect(float x, float y, float w, float h);
 void fill_line(float x1, float y1, float x2, float y2, float w);
 void fill_ellipse(float x, float y, float rx, float ry);
@@ -1191,12 +1191,12 @@ void fill_triangle(float x1, float y1, float x2, float y2, float x3, float y3) {
 void pshtv_mul_transform_matrix_by(float by[4][4]) {
     pshtv_flush_all();
 
-    float new[4][4] = {};
+    float res[4][4] = {};
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
             for (int g = 0; g < 4; ++g)
-                new[i][j] += pshtv_transform_matrix[i][g] * by[g][j];
-    memcpy(pshtv_transform_matrix, new, sizeof(float) * 4 * 4);
+                res[i][j] += pshtv_transform_matrix[i][g] * by[g][j];
+    memcpy(pshtv_transform_matrix, res, sizeof(float) * 4 * 4);
 }
 
 void translate(float x, float y) {

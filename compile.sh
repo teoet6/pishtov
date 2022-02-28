@@ -8,5 +8,10 @@ cat \
     > dist/pishtov.h
 
 cp src/game.c dist/game.c
+cp src/game.c dist/game.cpp
 
-time gcc --std=c11 dist/game.c -ldl -lX11 -lGL -lm -O2 -o bin/game
+echo 'Compiling with gcc'
+gcc --std=c11 dist/game.c -lX11 -lGL -lm -O2 -o bin/game
+
+echo 'Compiling with g++'
+g++ --std=c++11 dist/game.cpp -lX11 -lGL -lm -O2 -o bin/gamepp
