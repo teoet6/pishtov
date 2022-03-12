@@ -52,7 +52,7 @@ TODO In no particular order
     [X] Circles and Ellipses
     [ ] Arcs i.e. semicircles and semiellipses
     [X] Lines
-    [ ] Images
+    [X] Images
     [ ] Text
     [X] Translation, scaling and rotation of the canvas
     [ ] OS-independent network-programming
@@ -618,7 +618,7 @@ void pshtv_handle_events() {
             window_h = ev.xconfigure.height;
             break;
         case ClientMessage:
-            if (ev.xclient.data.l[0] == pshtv_atom_wm_delete_window)
+            if ((Atom)ev.xclient.data.l[0] == pshtv_atom_wm_delete_window)
                 exit(0);
             break;
         case DestroyNotify:
