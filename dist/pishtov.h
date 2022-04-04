@@ -165,7 +165,7 @@ void *pshtv_load_gl(const char* name) {
     // wglGetProcAddress returs NULL for non-extension functions, so we
     // need to load the function from opengl32.dll directly.
     if (!ret)
-        ret = load_wgl(name);
+        ret = pshtv_load_wgl(name);
     return ret;
 }
 
@@ -193,17 +193,17 @@ LRESULT CALLBACK pshtv_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
 }
 
 void pshtv_open_window(const char *name, int w, int h) {
-    pshtv_ChoosePixelFormat = (PSHTVPROC_CHOOSEPIXELFORMAT) load_gdi("ChoosePixelFormat");
-    pshtv_SetPixelFormat    = (PSHTVPROC_SETPIXELFORMAT)    load_gdi("SetPixelFormat");
-    pshtv_SwapBuffers       = (PSHTVPROC_SWAPBUFFERS)       load_gdi("SwapBuffers");
-    pshtv_wglCreateContext  = (PSHTVPROC_WGLCREATECONTEXT)  load_wgl("wglCreateContext");
-    pshtv_wglMakeCurrent    = (PSHTVPROC_WGLMAKECURRENT)    load_wgl("wglMakeCurrent");
-    pshtv_wglGetProcAddress = (PSHTVPROC_WGLGETPROCADDRESS) load_wgl("wglGetProcAddress");
+    pshtv_ChoosePixelFormat = (PSHTVPROC_CHOOSEPIXELFORMAT) pshtv_load_gdi("ChoosePixelFormat");
+    pshtv_SetPixelFormat    = (PSHTVPROC_SETPIXELFORMAT)    pshtv_load_gdi("SetPixelFormat");
+    pshtv_SwapBuffers       = (PSHTVPROC_SWAPBUFFERS)       pshtv_load_gdi("SwapBuffers");
+    pshtv_wglCreateContext  = (PSHTVPROC_WGLCREATECONTEXT)  pshtv_load_wgl("wglCreateContext");
+    pshtv_wglMakeCurrent    = (PSHTVPROC_WGLMAKECURRENT)    pshtv_load_wgl("wglMakeCurrent");
+    pshtv_wglGetProcAddress = (PSHTVPROC_WGLGETPROCADDRESS) pshtv_load_wgl("wglGetProcAddress");
 
     HINSTANCE hinstance = GetModuleHandle(NULL);
 
     WNDCLASS wc = {};
-    wc.lpfnWndProc = window_proc;
+    wc.lpfnWndProc = pshtv_window_proc;
     wc.hInstance   = hinstance;
     wc.lpszClassName = name;
     wc.style = CS_OWNDC;
