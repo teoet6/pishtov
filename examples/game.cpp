@@ -1,6 +1,7 @@
 #include "pishtov.h"
-#include <stdint.h>
-#include <time.h>
+#include <iostream>
+
+using namespace std;
 
 float my_x;
 float my_y;
@@ -20,7 +21,7 @@ void draw() {
 }
 
 void keydown(int key) {
-	printf("Keydown %d\n", key);
+	cout << "Keydown " << key << std::endl;
 }
 
 void keyup(int key) { }
@@ -28,6 +29,6 @@ void keyup(int key) { }
 void mousedown(int button) { }
 
 void mouseup(int button) {
-	printf("Mouse clicked at %.0f %.0f from %.0f %.0f\n", mouse_x, mouse_y, window_w, window_h);
+	cout << "Mouse clicked at " << mouse_x << " " << mouse_y << "from" << window_w << " " << window_h << std::endl;
 }
 

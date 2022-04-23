@@ -244,6 +244,9 @@ void pshtv_open_window(const char *name, int w, int h) {
 	pshtv_wglMakeCurrent(pshtv_hdc, context);
 
 	ShowWindow(pshtv_hwnd, SW_NORMAL);
+
+	window_w = w;
+	window_h = h;
 }
 
 void pshtv_handle_events() {
@@ -348,6 +351,9 @@ void pshtv_open_window(const char *name, int w, int h) {
 	XStoreName(pshtv_display, pshtv_window, name);
 
 	XMapWindow(pshtv_display, pshtv_window);
+
+	window_w = w;
+	window_h = h;
 }
 
 // TODO use KF86 keys as well

@@ -1,6 +1,5 @@
 #include "pishtov.h"
-#include <stdint.h>
-#include <time.h>
+#include "stdio.h"
 
 float my_x;
 float my_y;
