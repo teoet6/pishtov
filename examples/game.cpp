@@ -29,6 +29,6 @@ void keyup(int key) { }
 void mousedown(int button) { }
 
 void mouseup(int button) {
-	cout << "Mouse clicked at " << mouse_x << " " << mouse_y << "from" << window_w << " " << window_h << std::endl;
+	cout << "Mouse clicked at " << mouse_x << " " << mouse_y << " from " << window_w << " " << window_h << std::endl;
 }
 

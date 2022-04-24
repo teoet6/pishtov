@@ -111,7 +111,6 @@ void fill_line(float x1, float y1, float x2, float y2, float w);
 void fill_ellipse(float x, float y, float rx, float ry);
 void fill_triangle(float x1, float y1, float x2, float y2, float x3, float y3);
 void draw_image_buffer(uint8_t *buffer, uint32_t img_w, uint32_t img_h, float x, float y, float w, float h);
-void draw_image(char *filename, float x, float y, float w, float h);
 void translate(float x, float y);
 void scale(float x, float y);
 void rotate(float a);
