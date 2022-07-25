@@ -1,4 +1,4 @@
-#include "pishtov.h"
+#include "../pishtov.h"
 #include "stdio.h"
 
 float my_x;

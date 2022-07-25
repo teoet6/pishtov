@@ -1,4 +1,4 @@
-#include "pishtov.h"
+#include "../pishtov.h"
 #include <iostream>
 
 #define ARR_LEN(X) (sizeof(X) / sizeof((X)[0]))

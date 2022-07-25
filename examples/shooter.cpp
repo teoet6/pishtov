@@ -1,4 +1,4 @@
-#include "pishtov.h"
+#include "../pishtov.h"
 #include <cstdint>
 #include <iostream>
 #include <vector>

@@ -1,4 +1,4 @@
-#include "pishtov.h"
+#include "../pishtov.h"
 #include <iostream>
 
 using namespace std;
