@@ -14,7 +14,7 @@ int img_h;
 uint8_t *img_data;
 
 bool fill_rect_otherwise_fill_ellipse;
-int sharpens_per_update = 0;
+int sharpens_per_update = 1;
 
 typedef struct Node Node;
 struct Node {
