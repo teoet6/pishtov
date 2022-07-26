@@ -18,9 +18,11 @@ int sharpens_per_update = 1;
 
 typedef struct Node Node;
 struct Node {
-	uint32_t avg_col;
-	float amp_col;
-	uint32_t stop;
+	bool stop;
+
+	int avgr, avgg, avgb, avga;
+	int minr, ming, minb, mina;
+	int maxr, maxg, maxb, maxa;
 };
 
 Node *qt;
@@ -38,11 +40,11 @@ bool qt_build(Node **qt, int root, int l, int r, int u, int d) {
 	if (arr_len(*qt) <= root) arr_resize(qt, root);
 
 	if (l + 1 == r && u + 1 == d) {
-		(*qt)[root].avg_col = 0
-			| img_data[4 * u * img_w + 4 * l + 0]
-			| img_data[4 * u * img_w + 4 * l + 1] << 8
-			| img_data[4 * u * img_w + 4 * l + 2] << 16
-			| img_data[4 * u * img_w + 4 * l + 3] << 24;
+		(*qt)[root].avgr = (*qt)[root].minr = (*qt)[root].maxr = img_data[4 * u * img_w + 4 * l + 0];
+		(*qt)[root].avgg = (*qt)[root].ming = (*qt)[root].maxg = img_data[4 * u * img_w + 4 * l + 1];
+		(*qt)[root].avgb = (*qt)[root].minb = (*qt)[root].maxb = img_data[4 * u * img_w + 4 * l + 2];
+		(*qt)[root].avga = (*qt)[root].mina = (*qt)[root].maxa = img_data[4 * u * img_w + 4 * l + 3];
+
 		return true;
 	}
 
@@ -51,118 +53,49 @@ bool qt_build(Node **qt, int root, int l, int r, int u, int d) {
 
 	// +1 +2
 	// +3 +4
-	bool ok1 = qt_build(qt, root * 4 + 1, l,  lr, u,  ud);
-	bool ok2 = qt_build(qt, root * 4 + 2, lr,  r, u,  ud);
-	bool ok3 = qt_build(qt, root * 4 + 3, l,  lr, ud,  d);
-	bool ok4 = qt_build(qt, root * 4 + 4, lr,  r, ud,  d);
+	bool ok[4];
+	ok[0] = qt_build(qt, root * 4 + 1, l,  lr, u,  ud);
+	ok[1] = qt_build(qt, root * 4 + 2, lr,  r, u,  ud);
+	ok[2] = qt_build(qt, root * 4 + 3, l,  lr, ud,  d);
+	ok[3] = qt_build(qt, root * 4 + 4, lr,  r, ud,  d);
 
-	{
-		uint32_t sumr =   0, sumg =   0, sumb =   0, suma =   0;
-		uint32_t minr = 255, ming = 255, minb = 255, mina = 255;
-		uint32_t maxr =   0, maxg =   0, maxb =   0, maxa =   0;
+	uint32_t sumr = 0, sumg = 0, sumb = 0, suma = 0;
 
-		if (ok1) {
-			uint32_t r_ = (*qt)[root * 4 + 1].avg_col       & 0xff;
-			uint32_t g_ = (*qt)[root * 4 + 1].avg_col >>  8 & 0xff;
-			uint32_t b_ = (*qt)[root * 4 + 1].avg_col >> 16 & 0xff;
-			uint32_t a_ = (*qt)[root * 4 + 1].avg_col >> 24 & 0xff;
+	(*qt)[root].minr = 255;
+	(*qt)[root].ming = 255;
+	(*qt)[root].minb = 255;
+	(*qt)[root].mina = 255;
 
-			if (r_ < minr) minr = r_;
-			if (g_ < ming) ming = g_;
-			if (b_ < minb) minb = b_;
-			if (a_ < mina) mina = a_;
+	(*qt)[root].maxr = 0;
+	(*qt)[root].maxg = 0;
+	(*qt)[root].maxb = 0;
+	(*qt)[root].maxa = 0;
 
-			if (r_ > maxr) maxr = r_;
-			if (g_ > maxg) maxg = g_;
-			if (b_ > maxb) maxb = b_;
-			if (a_ > maxa) maxa = a_;
+	for (int i = 1; i <= 4; i += 1) {
+		if (ok[i - 1]) {
+			sumr += (*qt)[root * 4 + i].avgr;
+			sumg += (*qt)[root * 4 + i].avgg;
+			sumb += (*qt)[root * 4 + i].avgb;
+			suma += (*qt)[root * 4 + i].avga;
 
-			sumr += r_;
-			sumg += g_;
-			sumb += b_;
-			suma += a_;
+			if ((*qt)[root * 4 + i].minr < (*qt)[root].minr) (*qt)[root].minr = (*qt)[root * 4 + i].minr;
+			if ((*qt)[root * 4 + i].ming < (*qt)[root].ming) (*qt)[root].ming = (*qt)[root * 4 + i].ming;
+			if ((*qt)[root * 4 + i].minb < (*qt)[root].minb) (*qt)[root].minb = (*qt)[root * 4 + i].minb;
+			if ((*qt)[root * 4 + i].mina < (*qt)[root].mina) (*qt)[root].mina = (*qt)[root * 4 + i].mina;
+
+			if ((*qt)[root * 4 + i].maxr > (*qt)[root].maxr) (*qt)[root].maxr = (*qt)[root * 4 + i].maxr;
+			if ((*qt)[root * 4 + i].maxg > (*qt)[root].maxg) (*qt)[root].maxg = (*qt)[root * 4 + i].maxg;
+			if ((*qt)[root * 4 + i].maxb > (*qt)[root].maxb) (*qt)[root].maxb = (*qt)[root * 4 + i].maxb;
+			if ((*qt)[root * 4 + i].maxa > (*qt)[root].maxa) (*qt)[root].maxa = (*qt)[root * 4 + i].maxa;
 		}
-
-		if (ok2) {
-			uint32_t r_ = (*qt)[root * 4 + 2].avg_col       & 0xff;
-			uint32_t g_ = (*qt)[root * 4 + 2].avg_col >>  8 & 0xff;
-			uint32_t b_ = (*qt)[root * 4 + 2].avg_col >> 16 & 0xff;
-			uint32_t a_ = (*qt)[root * 4 + 2].avg_col >> 24 & 0xff;
-
-			if (r_ < minr) minr = r_;
-			if (g_ < ming) ming = g_;
-			if (b_ < minb) minb = b_;
-			if (a_ < mina) mina = a_;
-
-			if (r_ > maxr) maxr = r_;
-			if (g_ > maxg) maxg = g_;
-			if (b_ > maxb) maxb = b_;
-			if (a_ > maxa) maxa = a_;
-
-			sumr += r_;
-			sumg += g_;
-			sumb += b_;
-			suma += a_;
-		}
-
-		if (ok3) {
-			uint32_t r_ = (*qt)[root * 4 + 3].avg_col       & 0xff;
-			uint32_t g_ = (*qt)[root * 4 + 3].avg_col >>  8 & 0xff;
-			uint32_t b_ = (*qt)[root * 4 + 3].avg_col >> 16 & 0xff;
-			uint32_t a_ = (*qt)[root * 4 + 3].avg_col >> 24 & 0xff;
-
-			if (r_ < minr) minr = r_;
-			if (g_ < ming) ming = g_;
-			if (b_ < minb) minb = b_;
-			if (a_ < mina) mina = a_;
-
-			if (r_ > maxr) maxr = r_;
-			if (g_ > maxg) maxg = g_;
-			if (b_ > maxb) maxb = b_;
-			if (a_ > maxa) maxa = a_;
-
-			sumr += r_;
-			sumg += g_;
-			sumb += b_;
-			suma += a_;
-		}
-
-		if (ok4) {
-			uint32_t r_ = (*qt)[root * 4 + 4].avg_col       & 0xff;
-			uint32_t g_ = (*qt)[root * 4 + 4].avg_col >>  8 & 0xff;
-			uint32_t b_ = (*qt)[root * 4 + 4].avg_col >> 16 & 0xff;
-			uint32_t a_ = (*qt)[root * 4 + 4].avg_col >> 24 & 0xff;
-
-			if (r_ < minr) minr = r_;
-			if (g_ < ming) ming = g_;
-			if (b_ < minb) minb = b_;
-			if (a_ < mina) mina = a_;
-
-			if (r_ > maxr) maxr = r_;
-			if (g_ > maxg) maxg = g_;
-			if (b_ > maxb) maxb = b_;
-			if (a_ > maxa) maxa = a_;
-
-			sumr += r_;
-			sumg += g_;
-			sumb += b_;
-			suma += a_;
-		}
-
-		uint32_t num_cols = ok1 + ok2 + ok3 + ok4;
-		uint32_t avgr = sumr / num_cols;
-		uint32_t avgg = sumg / num_cols;
-		uint32_t avgb = sumb / num_cols;
-		uint32_t avga = suma / num_cols;
-
-		uint32_t deltar = maxr - minr;
-		uint32_t deltag = maxg - ming;
-		uint32_t deltab = maxb - minb;
-		uint32_t deltaa = maxa - mina;
-
-		(*qt)[root].avg_col = avgr | avgg << 8 | avgb << 16 | avga << 24;
-		(*qt)[root].amp_col = sqrt(deltar * deltar + deltag * deltag + deltab * deltab + deltaa * deltaa);
 	}
+
+	uint32_t num_cols = ok[0] + ok[1] + ok[2] + ok[3];
+
+	(*qt)[root].avgr = sumr / num_cols;
+	(*qt)[root].avgg = sumg / num_cols;
+	(*qt)[root].avgb = sumb / num_cols;
+	(*qt)[root].avga = suma / num_cols;
 
 	return true;
 }
@@ -181,8 +114,15 @@ void qt_ampest_stop(Node *qt, int root, int l, int r, int u, int d, int *ampest,
 		return;
 	}
 
-	if (qt[root].amp_col * (r - l) * (d - u) > *amp) {
-		*amp = qt[root].amp_col * (r - l) * (d - u);
+	float dr = qt[root].maxr - qt[root].minr;
+	float dg = qt[root].maxg - qt[root].ming;
+	float db = qt[root].maxb - qt[root].minb;
+	float da = qt[root].maxa - qt[root].mina;
+
+	float cur_amp = sqrt(dr * dr + dg * dg + db * db + da * da);
+
+	if (cur_amp > *amp) {
+		*amp = cur_amp;
 		*ampest = root;
 	}
 }
@@ -222,7 +162,8 @@ void qt_draw(Node *qt, int root, int l, int r, int u, int d) {
 	if (root >= arr_len(qt)) return;
 
 	if (qt[root].stop) {
-		fill_color_rgba(qt[root].avg_col);
+		uint32_t col = qt[root].avgr | qt[root].avgg << 8 | qt[root].avgb << 16 | qt[root].avga << 24;
+		fill_color_rgba(col);
 
 		if (fill_rect_otherwise_fill_ellipse) {
 			fill_rect(l, u, r - l, d - u);
