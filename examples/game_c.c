@@ -1,5 +1,4 @@
 #include "../pishtov.h"
-#include "stdio.h"
 
 float my_x;
 float my_y;

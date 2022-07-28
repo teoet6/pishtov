@@ -1,7 +1,6 @@
 #include <stdbool.h>
 
 #include "../pishtov.h"
-#include "stdio.h"
 #include "arr.h"
 
 #define STB_IMAGE_IMPLEMENTATION
