@@ -77,6 +77,23 @@ void save_block() {
 		int64_t y = block.y + block_defs[block.id].y[block.rot][i];
 		board[x][y] = true;
 	}
+
+	int64_t fall = 0;
+
+	for (int64_t y = board_h - 1; y >= 0; y -= 1) {
+		bool full_line = true;
+		for (int64_t x = 0; x < board_w; x += 1) {
+			board[x][y + fall] = board[x][y];
+			full_line = full_line && board[x][y];
+		}
+		if (full_line) fall += 1;
+	}
+
+	for (int64_t y = 0; y < fall; y += 1) {
+		for (int64_t x = 0; x < board_w; x += 1) {
+			board[x][y] = false;
+		}
+	}
 }
 
 void next_block() {
@@ -91,10 +108,10 @@ void init() {
 	next_block();
 }
 
-bool block_conflicts() {
+bool block_conflicts(Block b) {
 	for (uint64_t i = 0; i < 4; i += 1) {
-		int64_t x = block.x + block_defs[block.id].x[block.rot][i];
-		int64_t y = block.y + block_defs[block.id].y[block.rot][i];
+		int64_t x = b.x + block_defs[b.id].x[b.rot][i];
+		int64_t y = b.y + block_defs[b.id].y[b.rot][i];
 
 		if (x < 0)        return true;
 		if (x >= board_w) return true;
@@ -109,7 +126,7 @@ bool block_conflicts() {
 
 void tick() {
 	block.y += 1;
-	if (block_conflicts()) {
+	if (block_conflicts(block)) {
 		block.y -= 1;
 		save_block();
 		next_block();
@@ -139,6 +156,21 @@ void draw() {
 		}
 	}
 
+	{
+		Block ghost = block;
+		while (!block_conflicts(ghost)) {
+			ghost.y += 1;
+		}
+		ghost.y -= 1;
+
+		fill_color(0xffffff);
+		for (uint64_t i = 0; i < 4; i += 1) {
+			float x = ghost.x + block_defs[ghost.id].x[ghost.rot][i];
+			float y = ghost.y + block_defs[ghost.id].y[ghost.rot][i];
+			fill_rect(x, y, .95f, .95f);
+		}
+	}
+
 	fill_color(block_defs[block.id].color);
 	for (uint64_t i = 0; i < 4; i += 1) {
 		float x = block.x + block_defs[block.id].x[block.rot][i];
@@ -152,7 +184,7 @@ void keydown(int key) {
 		int64_t prev = block.rot;
 		if (block.rot == 0) block.rot = 3;
 		else block.rot -= 1;
-		if (block_conflicts()) block.rot = prev;
+		if (block_conflicts(block)) block.rot = prev;
 		return;
 	}
 
@@ -160,25 +192,25 @@ void keydown(int key) {
 		int64_t prev = block.rot;
 		if (block.rot == 3) block.rot = 0;
 		else block.rot += 1;
-		if (block_conflicts()) block.rot = prev;
+		if (block_conflicts(block)) block.rot = prev;
 		return;
 	}
 
 	if (key == 37) {
 		block.x -= 1;
-		if (block_conflicts()) block.x += 1;
+		if (block_conflicts(block)) block.x += 1;
 		return;
 	}
 
 	if (key == 39) {
 		block.x += 1;
-		if (block_conflicts()) block.x -= 1;
+		if (block_conflicts(block)) block.x -= 1;
 		return;
 	}
 
 	if (key == 40) {
 		block.y += 1;
-		if (block_conflicts()) {
+		if (block_conflicts(block)) {
 			block.y -= 1;
 			save_block();
 			next_block();
@@ -187,7 +219,7 @@ void keydown(int key) {
 	}
 
 	if (key == ' ') {
-		while (!block_conflicts()) block.y += 1;
+		while (!block_conflicts(block)) block.y += 1;
 		block.y -= 1;
 		save_block();
 		next_block();
