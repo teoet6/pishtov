@@ -53,7 +53,7 @@ TODO In no particular order
 	[ ] Arcs i.e. semicircles and semiellipses
 	[X] Lines
 	[X] Images
-	[ ] Text
+	[?] Text
 	[X] Translation, scaling and rotation of the canvas
 	[ ] OS-independent network-programming
 	[ ] 3D graphics

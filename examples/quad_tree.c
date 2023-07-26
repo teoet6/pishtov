@@ -6,7 +6,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define IMAGE_PATH "/home/teoet6/Downloads/Telegram Desktop/flowers.jpg"
+#define IMAGE_PATH "/home/teoet6/pics/walls/purple-water-purple-sky.jpg"
 
 int img_w;
 int img_h;
